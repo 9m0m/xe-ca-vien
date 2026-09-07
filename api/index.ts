@@ -14,33 +14,8 @@ export const config = {
 
 export const app = new Hono().basePath('/api')
 
-// In-memory rate limiting map (IP based, 120 requests/minute)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>()
-
-// 1. Security Headers & Rate Limiting Middleware
+// 1. Security Headers Middleware
 app.use('*', async (c, next) => {
-  const ip = c.req.header('x-forwarded-for') || c.req.header('x-real-ip') || '127.0.0.1'
-  const now = Date.now()
-  const record = rateLimitMap.get(ip)
-
-  if (record && record.resetAt > now) {
-    if (record.count >= 120) {
-      return c.json(
-        {
-          success: false,
-          error: {
-            code: 'TOO_MANY_REQUESTS',
-            message: 'Quá nhiều yêu cầu. Vui lòng thử lại sau giây lát.',
-          },
-        },
-        429,
-      )
-    }
-    record.count++
-  } else {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 })
-  }
-
   await next()
 
   c.header('X-Content-Type-Options', 'nosniff')

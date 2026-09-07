@@ -26,6 +26,22 @@ describe('Shop & Food Unlocks API', () => {
     expect(failBody.error.code).toBe('INSUFFICIENT_COINS')
 
     // 3. Earn coins via order completion to afford unlock
+    const startRes = await app.request('/api/v1/orders/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        preferredItems: [
+          { foodId: 'fish_ball_classic', quantity: 2 },
+          { foodId: 'sausage_red', quantity: 1 },
+        ],
+      }),
+    })
+    expect(startRes.status).toBe(200)
+    const startData = await startRes.json()
+
     const earnRes = await app.request('/api/v1/orders/complete', {
       method: 'POST',
       headers: {
@@ -33,15 +49,21 @@ describe('Shop & Food Unlocks API', () => {
         Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({
-        orderId: 'order_farm_coins',
+        orderId: startData.data.id,
         idempotencyKey: `idem_shop_earn_${Date.now()}`,
-        items: [{ foodId: 'fish_ball_classic', state: 'perfect' }],
-        coinsEarned: 25000,
-        xpEarned: 50,
+        servedItems: [
+          { foodId: 'fish_ball_classic', state: 'perfect' as const },
+          { foodId: 'fish_ball_classic', state: 'perfect' as const },
+          { foodId: 'sausage_red', state: 'perfect' as const },
+        ],
+        appliedSauces: ['tuong_ot'],
+        hasDuaChua: startData.data.hasDuaChua,
       }),
     })
+    expect(earnRes.status).toBe(200)
     const earnBody = await earnRes.json()
-    expect(earnBody.data.newTotalCoins).toBe(35000) // 10,000 + 25,000
+    expect(earnBody.data.newTotalCoins).toBeGreaterThanOrEqual(20000)
+    const totalCoinsBeforeUnlock = earnBody.data.newTotalCoins
 
     // 4. Now unlock fish_cake (cost = 20,000) -> should succeed
     const unlockRes = await app.request('/api/v1/shop/unlock', {
@@ -55,7 +77,7 @@ describe('Shop & Food Unlocks API', () => {
     expect(unlockRes.status).toBe(200)
     const unlockBody = await unlockRes.json()
     expect(unlockBody.success).toBe(true)
-    expect(unlockBody.data.newCoins).toBe(15000) // 35,000 - 20,000
+    expect(unlockBody.data.newCoins).toBe(totalCoinsBeforeUnlock - 20000)
     expect(unlockBody.data.unlockedFoods).toContain('fish_cake')
 
     // 5. Try unlocking fish_cake again -> should return ALREADY_UNLOCKED
@@ -76,7 +98,7 @@ describe('Shop & Food Unlocks API', () => {
       headers: { Authorization: `Bearer ${sessionToken}` },
     })
     const profileBody = await profileRes.json()
-    expect(profileBody.data.progress.coins).toBe(15000)
+    expect(profileBody.data.progress.coins).toBe(totalCoinsBeforeUnlock - 20000)
     expect(profileBody.data.unlockedFoods).toContain('fish_cake')
   })
 })

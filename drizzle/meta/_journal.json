@@ -29,6 +29,13 @@
       "when": 1788777874889,
       "tag": "0003_yummy_mach_iv",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788782226842,
+      "tag": "0004_lumpy_thanos",
+      "breakpoints": true
     }
   ]
 }

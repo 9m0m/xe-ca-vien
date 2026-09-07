@@ -7,6 +7,7 @@ import {
   timestamp,
   text,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core'
 
 // 1. Players Table
@@ -49,7 +50,7 @@ export const playerProgress = pgTable('player_progress', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-// 4. Food Unlocks
+// 4. Food Unlocks (Unique per player and food)
 export const playerFoodUnlocks = pgTable(
   'player_food_unlocks',
   {
@@ -62,10 +63,11 @@ export const playerFoodUnlocks = pgTable(
   },
   (table) => ({
     playerFoodIdx: index('idx_player_food_unlocks').on(table.playerId, table.foodId),
+    uniqPlayerFood: uniqueIndex('uniq_player_food_unlock').on(table.playerId, table.foodId),
   }),
 )
 
-// 5. Player Upgrades
+// 5. Player Upgrades (Unique per player and upgrade key)
 export const playerUpgrades = pgTable(
   'player_upgrades',
   {
@@ -79,10 +81,31 @@ export const playerUpgrades = pgTable(
   },
   (table) => ({
     playerUpgradeIdx: index('idx_player_upgrades').on(table.playerId, table.upgradeKey),
+    uniqPlayerUpgrade: uniqueIndex('uniq_player_upgrade').on(table.playerId, table.upgradeKey),
   }),
 )
 
-// 6. Order Runs (Auditing & Idempotent Rewards)
+// 6. Active Orders (Server-authoritative active orders tracking)
+export const activeOrders = pgTable(
+  'active_orders',
+  {
+    id: varchar('id', { length: 128 }).primaryKey(),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    itemsJson: text('items_json').notNull(),
+    requestedSaucesJson: text('requested_sauces_json').notNull(),
+    hasDuaChua: boolean('has_dua_chua').notNull().default(false),
+    status: varchar('status', { length: 32 }).notNull().default('active'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    patienceMs: integer('patience_ms').notNull().default(60000),
+  },
+  (table) => ({
+    activeOrderPlayerIdx: index('idx_active_orders_player').on(table.playerId),
+  }),
+)
+
+// 7. Order Runs (Auditing & Idempotent Rewards)
 export const orderRuns = pgTable(
   'order_runs',
   {
@@ -103,7 +126,7 @@ export const orderRuns = pgTable(
   }),
 )
 
-// 7. Player Stats (Orders, perfect fries, total revenue)
+// 8. Player Stats (Orders, perfect fries, total revenue)
 export const playerStats = pgTable('player_stats', {
   id: uuid('id').primaryKey().defaultRandom(),
   playerId: uuid('player_id')
@@ -116,7 +139,7 @@ export const playerStats = pgTable('player_stats', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
-// 8. Player Achievements
+// 9. Player Achievements (Unique per player and achievement)
 export const playerAchievements = pgTable(
   'player_achievements',
   {
@@ -130,5 +153,9 @@ export const playerAchievements = pgTable(
   },
   (table) => ({
     playerAchievementIdx: index('idx_player_achievements').on(table.playerId, table.achievementId),
+    uniqPlayerAchievement: uniqueIndex('uniq_player_achievement').on(
+      table.playerId,
+      table.achievementId,
+    ),
   }),
 )

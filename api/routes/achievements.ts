@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { PlayerRepository } from '../../src/db/repository'
 import { ACHIEVEMENTS } from '../../src/game/data/achievements'
+import { getSessionToken } from './session'
 
 export const achievementsRouter = new Hono()
 
@@ -22,8 +23,7 @@ achievementsRouter.get('/list', (c) => {
 
 // POST /api/v1/achievements/claim - Claim reward for an unlocked achievement
 achievementsRouter.post('/claim', zValidator('json', ClaimAchievementSchema), async (c) => {
-  const authHeader = c.req.header('Authorization')
-  const token = authHeader?.replace('Bearer ', '')
+  const token = getSessionToken(c)
 
   if (!token) {
     return c.json(

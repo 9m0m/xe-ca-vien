@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { PlayerRepository } from '../../src/db/repository'
 import { getFoodConfig, getUnlockCost } from '../../src/game/data/catalog'
+import { getSessionToken } from './session'
 
 export const shopRouter = new Hono()
 
@@ -12,8 +13,7 @@ const UnlockFoodSchema = z.object({
 
 // POST /api/v1/shop/unlock - Unlock new food item with coins
 shopRouter.post('/unlock', zValidator('json', UnlockFoodSchema), async (c) => {
-  const authHeader = c.req.header('Authorization')
-  const token = authHeader?.replace('Bearer ', '')
+  const token = getSessionToken(c)
 
   if (!token) {
     return c.json(

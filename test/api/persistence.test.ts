@@ -61,13 +61,28 @@ describe('Server-Authoritative Persistence & Sessions', () => {
   })
 
   it('should record completed order and award coins/xp idempotently', async () => {
+    // 1. Register active order on server first
+    const startRes = await app.request('/api/v1/orders/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        preferredItems: [{ foodId: 'fish_ball_classic', quantity: 1 }],
+      }),
+    })
+    expect(startRes.status).toBe(200)
+    const startData = await startRes.json()
+    const orderId = startData.data.id
+
     const idempotencyKey = `idem_${Date.now()}_test1234`
     const orderPayload = {
-      orderId: 'order_test_999',
+      orderId,
       idempotencyKey,
-      items: [{ foodId: 'fish_ball_classic', state: 'perfect' }],
-      coinsEarned: 13000,
-      xpEarned: 30,
+      servedItems: [{ foodId: 'fish_ball_classic', state: 'perfect' as const }],
+      appliedSauces: ['tuong_ot'],
+      hasDuaChua: startData.data.hasDuaChua,
     }
 
     // First attempt
@@ -83,8 +98,9 @@ describe('Server-Authoritative Persistence & Sessions', () => {
     const body1 = await res1.json()
     expect(body1.success).toBe(true)
     expect(body1.data.wasIdempotent).toBe(false)
-    expect(body1.data.coinsAwarded).toBe(13000)
-    expect(body1.data.newTotalCoins).toBe(23000) // 10000 starter + 13000
+    expect(body1.data.coinsAwarded).toBeGreaterThan(0)
+    const expectedCoins = 10000 + body1.data.coinsAwarded
+    expect(body1.data.newTotalCoins).toBe(expectedCoins)
 
     // Duplicate submission with identical idempotencyKey
     const res2 = await app.request('/api/v1/orders/complete', {
@@ -99,16 +115,16 @@ describe('Server-Authoritative Persistence & Sessions', () => {
     const body2 = await res2.json()
     expect(body2.success).toBe(true)
     expect(body2.data.wasIdempotent).toBe(true)
-    // Coins must remain 23000, NOT 36000!
-    expect(body2.data.newTotalCoins).toBe(23000)
+    // Coins must remain exactly expectedCoins, NOT duplicate award!
+    expect(body2.data.newTotalCoins).toBe(expectedCoins)
 
-    // Verify player profile reflects exactly 23000
+    // Verify player profile reflects exactly expectedCoins
     const profileRes = await app.request('/api/v1/player', {
       headers: {
         Authorization: `Bearer ${sessionToken}`,
       },
     })
     const profileBody = await profileRes.json()
-    expect(profileBody.data.progress.coins).toBe(23000)
+    expect(profileBody.data.progress.coins).toBe(expectedCoins)
   })
 })

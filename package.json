@@ -13,6 +13,7 @@
     "format": "prettier --check .",
     "format:write": "prettier --write .",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate"
   },
   "dependencies": {
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@eslint/js": "^9.21.0",
     "@hono/vite-dev-server": "^0.18.2",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@types/node": "^22.13.5",

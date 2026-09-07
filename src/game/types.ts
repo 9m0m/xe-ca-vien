@@ -71,4 +71,5 @@ export interface ServeEvaluation {
   speedScore: number
   reputationEarned: number
   feedback: string
+  servedItems?: { foodId: string; state: CookingState }[]
 }

@@ -48,7 +48,23 @@ describe('Cart Upgrades & Progression API', () => {
     expect(awningJson.data.newCoins).toBe(0) // 10,000 - 10,000
     expect(awningJson.data.upgrades.awning_comfort).toBe(2)
 
-    // 4. Complete orders to level up to Level 2 and earn 20,000 coins
+    // 4. Complete orders to level up to Level 2 and earn coins
+    const startRes = await app.request('/api/v1/orders/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        preferredItems: [
+          { foodId: 'fish_ball_classic', quantity: 1 },
+          { foodId: 'beef_ball_classic', quantity: 2 },
+        ],
+      }),
+    })
+    expect(startRes.status).toBe(200)
+    const startData = await startRes.json()
+
     const completeRes = await app.request('/api/v1/orders/complete', {
       method: 'POST',
       headers: {
@@ -56,23 +72,25 @@ describe('Cart Upgrades & Progression API', () => {
         Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({
-        orderId: 'order_progression_farm',
+        orderId: startData.data.id,
         idempotencyKey: `idem_upgrade_farm_${Date.now()}`,
-        items: [
-          { foodId: 'fish_ball_classic', state: 'perfect' },
-          { foodId: 'beef_ball_classic', state: 'perfect' },
+        servedItems: [
+          { foodId: 'fish_ball_classic', state: 'perfect' as const },
+          { foodId: 'beef_ball_classic', state: 'perfect' as const },
+          { foodId: 'beef_ball_classic', state: 'perfect' as const },
         ],
-        coinsEarned: 20000,
-        xpEarned: 150, // 150 XP -> Level 2
+        appliedSauces: ['tuong_ot'],
+        hasDuaChua: startData.data.hasDuaChua,
       }),
     })
     const completeJson = await completeRes.json()
     expect(completeJson.data.newLevel).toBe(2)
-    expect(completeJson.data.newTotalCoins).toBe(20000)
+    expect(completeJson.data.newTotalCoins).toBeGreaterThanOrEqual(15000)
+    const coinsEarned = completeJson.data.newTotalCoins
     // Achievement "first_order" should be in newlyUnlockedAchievements
     expect(completeJson.data.newlyUnlockedAchievements).toContain('first_order')
     expect(completeJson.data.stats.ordersServed).toBe(1)
-    expect(completeJson.data.stats.perfectItemsFried).toBe(2)
+    expect(completeJson.data.stats.perfectItemsFried).toBe(3)
 
     // 5. Claim "first_order" achievement reward (+2,000 coins, +50 XP)
     const claimRes = await app.request('/api/v1/achievements/claim', {
@@ -86,10 +104,10 @@ describe('Cart Upgrades & Progression API', () => {
     expect(claimRes.status).toBe(200)
     const claimJson = await claimRes.json()
     expect(claimJson.success).toBe(true)
-    expect(claimJson.data.newCoins).toBe(22000) // 20,000 + 2,000
+    expect(claimJson.data.newCoins).toBe(coinsEarned + 2000)
     expect(claimJson.data.claimedAchievements).toContain('first_order')
 
-    // 6. Purchase pan_capacity tier 2 (costs 15,000, player has 22,000) -> Succeeds!
+    // 6. Purchase pan_capacity tier 2 (costs 15,000) -> Succeeds!
     const panRes = await app.request('/api/v1/upgrades/purchase', {
       method: 'POST',
       headers: {
@@ -101,17 +119,31 @@ describe('Cart Upgrades & Progression API', () => {
     expect(panRes.status).toBe(200)
     const panJson = await panRes.json()
     expect(panJson.success).toBe(true)
-    expect(panJson.data.newCoins).toBe(7000) // 22,000 - 15,000
+    expect(panJson.data.newCoins).toBe(coinsEarned + 2000 - 15000)
     expect(panJson.data.upgrades.pan_capacity).toBe(2)
 
-    // 7. Now player is Level 2 with 7,000 coins. Try purchasing speed_tongs tier 2 (costs 8,000, level 2) -> INSUFFICIENT_COINS
-    const noMoneyRes = await app.request('/api/v1/upgrades/purchase', {
+    // 7. Purchase speed_tongs tier 2 (cost 8,000, level 2) -> Succeeds!
+    const tongsRes = await app.request('/api/v1/upgrades/purchase', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({ upgradeKey: 'speed_tongs' }),
+    })
+    expect(tongsRes.status).toBe(200)
+    const tongsJson = await tongsRes.json()
+    expect(tongsJson.success).toBe(true)
+    expect(tongsJson.data.upgrades.speed_tongs).toBe(2)
+
+    // Now player has less than 12,000 coins. Attempting oil_thermostat tier 2 (requires level 2, cost 12,000) fails with INSUFFICIENT_COINS
+    const noMoneyRes = await app.request('/api/v1/upgrades/purchase', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({ upgradeKey: 'oil_thermostat' }),
     })
     expect(noMoneyRes.status).toBe(400)
     const noMoneyJson = await noMoneyRes.json()

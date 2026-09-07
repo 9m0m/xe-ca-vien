@@ -493,7 +493,13 @@ export class KitchenScene extends Phaser.Scene {
     this.unsubscribeStore = useAppStore.subscribe((state, prev) => {
       if (state.unlockedFoods.length !== prev.unlockedFoods.length) {
         this.refreshFoodPrepTray()
-        this.cookingManager.generateCustomerOrder(state.unlockedFoods)
+        const newOrder = this.cookingManager.generateCustomerOrder(state.unlockedFoods)
+        const { startOrder } = useAppStore.getState()
+        startOrder(newOrder.items.map((it) => ({ foodId: it.foodId, quantity: it.quantity })))
+          .then((serverOrder) => {
+            if (serverOrder) newOrder.orderId = serverOrder.id
+          })
+          .catch(() => {})
         this.refreshOrderDisplay()
       }
       if (state.upgrades !== prev.upgrades) {
@@ -504,6 +510,18 @@ export class KitchenScene extends Phaser.Scene {
         soundManager.updateFryingVolume()
       }
     })
+
+    // Register initial order with backend if online
+    const initialOrder = this.cookingManager.getCurrentOrder()
+    if (initialOrder) {
+      useAppStore
+        .getState()
+        .startOrder(initialOrder.items.map((it) => ({ foodId: it.foodId, quantity: it.quantity })))
+        .then((serverOrder) => {
+          if (serverOrder) initialOrder.orderId = serverOrder.id
+        })
+        .catch(() => {})
+    }
   }
 
   private refreshFoodPrepTray() {
@@ -676,8 +694,11 @@ export class KitchenScene extends Phaser.Scene {
     }
   }
 
-  private handleServeOrder() {
+  private async handleServeOrder() {
     const currentOrder = this.cookingManager.getCurrentOrder()
+    const appliedSauces = this.cookingManager.getSelectedSauces()
+    const hasDuaChua = this.cookingManager.getHasDuaChua()
+
     const evalResult = this.cookingManager.serveCurrentOrder()
 
     if (!evalResult.success) {
@@ -691,10 +712,27 @@ export class KitchenScene extends Phaser.Scene {
     triggerHaptic('success')
 
     // Submit reward to server-authoritative backend
-    const { submitOrderReward } = useAppStore.getState()
+    const { submitOrderReward, startOrder, isOnline } = useAppStore.getState()
+    let orderId = currentOrder?.orderId ?? `ord_${Date.now()}`
+
+    if (isOnline && (!orderId || orderId.startsWith('order_'))) {
+      const serverOrder = await startOrder(
+        currentOrder?.items.map((it) => ({ foodId: it.foodId, quantity: it.quantity })),
+      )
+      if (serverOrder) {
+        orderId = serverOrder.id
+      }
+    }
+
+    const servedItems =
+      evalResult.servedItems ??
+      (currentOrder?.items ?? []).map((it) => ({ foodId: it.foodId, state: 'perfect' as const }))
+
     submitOrderReward({
-      orderId: currentOrder?.orderId ?? `ord_${Date.now()}`,
-      items: (currentOrder?.items ?? []).map((it) => ({ foodId: it.foodId, state: 'perfect' })),
+      orderId,
+      items: servedItems,
+      appliedSauces,
+      hasDuaChua,
       coinsEarned: evalResult.coinsEarned,
       xpEarned: evalResult.xpEarned,
     })

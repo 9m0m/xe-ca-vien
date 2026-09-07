@@ -1,5 +1,5 @@
 // Xe Cá Viên PWA Service Worker
-const CACHE_NAME = 'xcv-cache-v1'
+const CACHE_NAME = 'xcv-cache-v2'
 const PRECACHE_URLS = [
   '/',
   '/index.html',
@@ -31,28 +31,42 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  // 1. Strictly ignore non-GET requests (mutations like POST/PUT/DELETE must never touch CacheStorage)
+  if (event.request.method !== 'GET') {
+    return
+  }
+
   const url = new URL(event.request.url)
 
-  // API calls are strictly network-first, never cached by SW
+  // 2. API calls are strictly network-only, never cached or intercepted by SW
   if (url.pathname.startsWith('/api/')) {
     return
   }
 
-  // Navigation requests: Stale-While-Revalidate with fallback to /index.html
-  if (event.request.mode === 'navigate') {
+  // 3. Navigation and HTML entry points: Network-First with offline cache fallback
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
     event.respondWith(
-      fetch(event.request).catch(() =>
-        caches.match('/index.html').then((res) => res || fetch(event.request)),
-      ),
+      fetch(event.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone()
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy))
+          }
+          return networkResponse
+        })
+        .catch(() =>
+          caches
+            .match('/index.html')
+            .then((res) => res || new Response('Ngoại tuyến', { status: 503 })),
+        ),
     )
     return
   }
 
-  // Static assets: Cache-First with background network update
+  // 4. Static assets (hashed JS/CSS, images, sounds): Cache-First with background network update
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch in background to update cache
         fetch(event.request)
           .then((networkResponse) => {
             if (networkResponse && networkResponse.status === 200) {
@@ -77,7 +91,6 @@ self.addEventListener('fetch', (event) => {
           return networkResponse
         })
         .catch(() => {
-          // If offline and asset is missing, return fallback or empty
           return new Response('Ngoại tuyến', { status: 503, statusText: 'Offline' })
         })
     }),

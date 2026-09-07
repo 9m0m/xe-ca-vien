@@ -3,6 +3,7 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 import { PlayerRepository } from '../../src/db/repository'
 import { CART_UPGRADES, getUpgradeConfig, getNextUpgradeTier } from '../../src/game/data/upgrades'
+import { getSessionToken } from './session'
 
 export const upgradesRouter = new Hono()
 
@@ -22,8 +23,7 @@ upgradesRouter.get('/catalog', (c) => {
 
 // POST /api/v1/upgrades/purchase - Purchase an upgrade tier
 upgradesRouter.post('/purchase', zValidator('json', PurchaseUpgradeSchema), async (c) => {
-  const authHeader = c.req.header('Authorization')
-  const token = authHeader?.replace('Bearer ', '')
+  const token = getSessionToken(c)
 
   if (!token) {
     return c.json(

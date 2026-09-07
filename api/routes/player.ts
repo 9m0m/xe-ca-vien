@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { PlayerRepository } from '../../src/db/repository'
+import { getSessionToken } from './session'
 
 export const playerRouter = new Hono()
 
 // GET /api/v1/player - Retrieve player profile and balances
 playerRouter.get('/', async (c) => {
-  const authHeader = c.req.header('Authorization')
-  const token = authHeader?.replace('Bearer ', '')
+  const token = getSessionToken(c)
 
   if (!token) {
     return c.json(

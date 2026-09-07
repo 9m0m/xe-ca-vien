@@ -32,14 +32,17 @@ interface AppState {
 
   // Actions
   initSession: () => Promise<void>
+  startOrder: (items?: { foodId: string; quantity: number }[]) => Promise<{ id: string } | null>
   unlockFood: (foodId: string) => Promise<{ success: boolean; message?: string }>
   purchaseUpgrade: (upgradeKey: string) => Promise<{ success: boolean; message?: string }>
   claimAchievement: (achievementId: string) => Promise<{ success: boolean; message?: string }>
   submitOrderReward: (payload: {
     orderId: string
     items: { foodId: string; state: 'raw' | 'cooking' | 'perfect' | 'overcooked' }[]
-    coinsEarned: number
-    xpEarned: number
+    appliedSauces?: string[]
+    hasDuaChua?: boolean
+    coinsEarned?: number
+    xpEarned?: number
   }) => Promise<{ success: boolean; newCoins: number; newXp: number; newLevel: number }>
   setPlayerStats: (stats: {
     coins?: number
@@ -159,8 +162,35 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  startOrder: async (items) => {
+    const { sessionToken, isOnline } = get()
+    if (!isOnline) return null
+    try {
+      const res = await fetch('/api/v1/orders/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+        },
+        body: JSON.stringify({ preferredItems: items }),
+      })
+      if (res.ok) {
+        const json = await res.json()
+        if (json.success && json.data) {
+          return { id: json.data.id }
+        }
+      }
+    } catch (err) {
+      console.warn('Unable to register active order with server:', err)
+    }
+    return null
+  },
+
   unlockFood: async (foodId: string) => {
-    const { sessionToken, unlockedFoods } = get()
+    const { sessionToken, isOnline } = get()
+    if (!isOnline) {
+      return { success: false, message: 'Cần kết nối mạng để mở khóa món ăn.' }
+    }
     try {
       const res = await fetch('/api/v1/shop/unlock', {
         method: 'POST',
@@ -186,20 +216,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { success: false, message: json.error?.message }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối máy chủ'
-      // Local fallback for offline mode
-      if (!unlockedFoods.includes(foodId)) {
-        set((s) => ({
-          unlockedFoods: [...s.unlockedFoods, foodId],
-          stats: { ...s.stats, foodsUnlockedCount: s.unlockedFoods.length + 1 },
-        }))
-        return { success: true }
-      }
       return { success: false, message }
     }
   },
 
   purchaseUpgrade: async (upgradeKey: string) => {
-    const { sessionToken, upgrades } = get()
+    const { sessionToken, isOnline } = get()
+    if (!isOnline) {
+      return { success: false, message: 'Cần kết nối mạng để nâng cấp xe.' }
+    }
     try {
       const res = await fetch('/api/v1/upgrades/purchase', {
         method: 'POST',
@@ -231,18 +256,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { success: false, message: json.error?.message }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối máy chủ'
-      // Local fallback for offline mode
-      const curTier = upgrades[upgradeKey] ?? 1
-      set((s) => ({
-        upgrades: { ...s.upgrades, [upgradeKey]: curTier + 1 },
-        stats: { ...s.stats, upgradesPurchasedCount: s.stats.upgradesPurchasedCount + 1 },
-      }))
-      return { success: true, message }
+      return { success: false, message }
     }
   },
 
   claimAchievement: async (achievementId: string) => {
-    const { sessionToken, unlockedAchievements, claimedAchievements } = get()
+    const { sessionToken, isOnline } = get()
+    if (!isOnline) {
+      return { success: false, message: 'Cần kết nối mạng để nhận thưởng thành tựu.' }
+    }
     try {
       const res = await fetch('/api/v1/achievements/claim', {
         method: 'POST',
@@ -266,15 +288,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       return { success: false, message: json.error?.message }
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : 'Lỗi kết nối máy chủ'
-      if (
-        !claimedAchievements.includes(achievementId) &&
-        unlockedAchievements.includes(achievementId)
-      ) {
-        set((s) => ({
-          claimedAchievements: [...s.claimedAchievements, achievementId],
-        }))
-        return { success: true }
-      }
       return { success: false, message }
     }
   },
@@ -294,9 +307,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           body: JSON.stringify({
             orderId: payload.orderId,
             idempotencyKey,
-            items: payload.items,
-            coinsEarned: payload.coinsEarned,
-            xpEarned: payload.xpEarned,
+            servedItems: payload.items,
+            appliedSauces: payload.appliedSauces || [],
+            hasDuaChua: payload.hasDuaChua ?? false,
           }),
         })
 
@@ -332,9 +345,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
-    // Local fallback if offline
-    const updatedCoins = coins + payload.coinsEarned
-    const updatedXp = xp + payload.xpEarned
+    // Explicitly non-authoritative fallback if completely offline
+    const estimatedCoins = payload.coinsEarned ?? 0
+    const estimatedXp = payload.xpEarned ?? 0
+    const updatedCoins = coins + estimatedCoins
+    const updatedXp = xp + estimatedXp
     const updatedLevel = 1 + Math.floor(updatedXp / 100)
     const perfectCount = payload.items.filter((it) => it.state === 'perfect').length
     set({
@@ -345,7 +360,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...stats,
         ordersServed: stats.ordersServed + 1,
         perfectItemsFried: stats.perfectItemsFried + perfectCount,
-        totalCoinsEarned: stats.totalCoinsEarned + payload.coinsEarned,
+        totalCoinsEarned: stats.totalCoinsEarned + estimatedCoins,
       },
     })
     return {

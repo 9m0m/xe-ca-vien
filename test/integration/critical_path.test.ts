@@ -29,8 +29,9 @@ describe('Critical Flow Integration: New Visitor to Persisted Upgrade', () => {
   })
 
   it('2. Player cooks order in CookingManager, serves with satisfaction, and receives rewards', async () => {
+    const starterFoods = ['fish_ball_classic', 'beef_ball_classic', 'sausage_red', 'fish_tofu']
     const manager = new CookingManager(6)
-    const order = manager.getCurrentOrder()!
+    const order = manager.generateCustomerOrder(starterFoods)
     expect(order).toBeDefined()
 
     // Cook first required item to golden perfection
@@ -61,8 +62,26 @@ describe('Critical Flow Integration: New Visitor to Persisted Upgrade', () => {
     expect(evalResult.coinsEarned).toBeGreaterThan(0)
     expect(evalResult.xpEarned).toBeGreaterThan(0)
 
+    // 1. Register order on server first
+    const startRes = await app.request('/api/v1/orders/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        preferredItems: order.items.map((it) => ({ foodId: it.foodId, quantity: it.quantity })),
+      }),
+    })
+    expect(startRes.status).toBe(200)
+    const startData = await startRes.json()
+    const serverOrderId = startData.data.id
+
     // Submit reward to server with idempotency key
     const idempotencyKey = `crit_flow_order_${Date.now()}`
+    const servedItems = evalResult.servedItems ?? [
+      { foodId: firstReq.foodId, state: 'perfect' as const },
+    ]
     const res = await app.request('/api/v1/orders/complete', {
       method: 'POST',
       headers: {
@@ -70,18 +89,20 @@ describe('Critical Flow Integration: New Visitor to Persisted Upgrade', () => {
         Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({
-        orderId: order.orderId,
+        orderId: serverOrderId,
         idempotencyKey,
-        items: [{ foodId: firstReq.foodId, state: 'perfect' }],
-        coinsEarned: evalResult.coinsEarned,
-        xpEarned: evalResult.xpEarned,
+        servedItems,
+        appliedSauces: manager.getSelectedSauces(),
+        hasDuaChua: manager.getHasDuaChua(),
       }),
     })
 
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.success).toBe(true)
-    expect(json.data.newTotalCoins).toBe(initialCoins + evalResult.coinsEarned)
+    expect(json.data.coinsAwarded).toBeGreaterThan(0)
+    const expectedCoins = initialCoins + json.data.coinsAwarded
+    expect(json.data.newTotalCoins).toBe(expectedCoins)
 
     // Replay attack / duplicate submit protection: same idempotencyKey should return existing record without adding coins
     const replayRes = await app.request('/api/v1/orders/complete', {
@@ -91,17 +112,18 @@ describe('Critical Flow Integration: New Visitor to Persisted Upgrade', () => {
         Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({
-        orderId: order.orderId,
+        orderId: serverOrderId,
         idempotencyKey,
-        items: [{ foodId: firstReq.foodId, state: 'perfect' }],
-        coinsEarned: evalResult.coinsEarned,
-        xpEarned: evalResult.xpEarned,
+        servedItems,
+        appliedSauces: manager.getSelectedSauces(),
+        hasDuaChua: manager.getHasDuaChua(),
       }),
     })
 
     expect(replayRes.status).toBe(200)
     const replayJson = await replayRes.json()
-    expect(replayJson.data.newTotalCoins).toBe(initialCoins + evalResult.coinsEarned)
+    expect(replayJson.data.wasIdempotent).toBe(true)
+    expect(replayJson.data.newTotalCoins).toBe(expectedCoins)
   })
 
   it('3. Page refresh restores authoritative progress from server', async () => {
@@ -120,7 +142,23 @@ describe('Critical Flow Integration: New Visitor to Persisted Upgrade', () => {
   })
 
   it('4. Player earns enough coins, purchases cart upgrade, and upgrade persists after refresh', async () => {
-    // Award 25,000 đ to fund pan_capacity upgrade (Tier 2 costs 12,000 đ)
+    // Register active order to fund pan_capacity upgrade (Tier 2 costs 15,000 đ and requires Level 2)
+    const bonusStart = await app.request('/api/v1/orders/start', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${sessionToken}`,
+      },
+      body: JSON.stringify({
+        preferredItems: [
+          { foodId: 'fish_ball_classic', quantity: 2 },
+          { foodId: 'beef_ball_classic', quantity: 2 },
+        ],
+      }),
+    })
+    expect(bonusStart.status).toBe(200)
+    const bonusStartData = await bonusStart.json()
+
     await app.request('/api/v1/orders/complete', {
       method: 'POST',
       headers: {
@@ -128,11 +166,16 @@ describe('Critical Flow Integration: New Visitor to Persisted Upgrade', () => {
         Authorization: `Bearer ${sessionToken}`,
       },
       body: JSON.stringify({
-        orderId: 'bonus_order_for_upgrade',
+        orderId: bonusStartData.data.id,
         idempotencyKey: `crit_bonus_${Date.now()}`,
-        items: [{ foodId: 'fish_ball_classic', state: 'perfect' }],
-        coinsEarned: 25000,
-        xpEarned: 200,
+        servedItems: [
+          { foodId: 'fish_ball_classic', state: 'perfect' as const },
+          { foodId: 'fish_ball_classic', state: 'perfect' as const },
+          { foodId: 'beef_ball_classic', state: 'perfect' as const },
+          { foodId: 'beef_ball_classic', state: 'perfect' as const },
+        ],
+        appliedSauces: ['tuong_ot'],
+        hasDuaChua: bonusStartData.data.hasDuaChua,
       }),
     })
 

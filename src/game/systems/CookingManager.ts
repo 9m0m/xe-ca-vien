@@ -264,6 +264,7 @@ export class CookingManager {
 
     const remainingPlate = [...this.plateItems]
     const matchedPlateIndices: number[] = []
+    const servedItems: { foodId: string; state: import('../types').CookingState }[] = []
 
     let allFulfilled = true
 
@@ -280,6 +281,7 @@ export class CookingManager {
 
         if (item.foodId === orderItem.foodId) {
           matchedPlateIndices.push(i)
+          servedItems.push({ foodId: item.foodId, state: item.state })
           fulfilledForThisType++
 
           if (item.state === 'perfect') {
@@ -424,6 +426,7 @@ export class CookingManager {
       speedScore,
       reputationEarned,
       feedback,
+      servedItems,
     }
   }
 }
