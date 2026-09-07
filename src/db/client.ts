@@ -1,10 +1,15 @@
 import { Pool, neonConfig } from '@neondatabase/serverless'
 import { drizzle } from 'drizzle-orm/neon-serverless'
 import * as schema from './schema'
-import ws from 'ws'
-
+// Configure WebSocket for environments where global WebSocket is missing (legacy Node.js).
+// Modern Node (>=22) and Vercel Edge runtime provide global WebSocket natively.
 if (typeof WebSocket === 'undefined') {
-  neonConfig.webSocketConstructor = ws
+  try {
+    const wsModule = await import('ws')
+    neonConfig.webSocketConstructor = wsModule.default || wsModule
+  } catch {
+    // Edge runtime / browser environments have native WebSocket support
+  }
 }
 
 let cachedPool: Pool | null = null
