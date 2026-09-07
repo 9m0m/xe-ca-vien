@@ -1,0 +1,38 @@
+:root {
+  /* Vietnamese Street-Food Cart Inox & Metal Palette */
+  --color-inox-light: #f1f5f9;
+  --color-inox-base: #cbd5e1;
+  --color-inox-dark: #64748b;
+  --color-inox-border: #94a3b8;
+
+  /* Cart Wood & Structure */
+  --color-cart-wood: #78350f;
+  --color-cart-wood-dark: #451a03;
+  --color-cart-awning: #b91c1c;
+  --color-cart-awning-accent: #fef08a;
+
+  /* Menu Board / Chalkboard */
+  --color-board-bg: #1e2530;
+  --color-board-text: #f8fafc;
+  --color-board-border: #334155;
+
+  /* Street Ambiance */
+  --color-street-bg: #0f172a;
+  --color-street-amber: #f59e0b;
+
+  /* Sauces */
+  --color-sauce-chili: #dc2626;
+  --color-sauce-black: #2b1810;
+  --color-sauce-mayo: #fef3c7;
+
+  /* Frying State Colors */
+  --color-fried-raw: #fde68a;
+  --color-fried-golden: #d97706;
+  --color-fried-crispy: #b45309;
+  --color-fried-over: #451a03;
+
+  /* UI Tokens */
+  --font-street: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --radius-tactile: 6px;
+  --radius-plate: 10px;
+}

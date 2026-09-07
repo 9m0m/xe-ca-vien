@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Production build outputs
+dist/
+dist-ssr/
+build/
+.vercel/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test & coverage
+coverage/
+playwright-report/
+test-results/
+
+# Cache & logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.eslintcache
+.stylelintcache
+.turbo/
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
