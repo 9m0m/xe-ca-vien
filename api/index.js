@@ -6,7 +6,6 @@ var __export = (target, all) => {
 
 // api/index.ts
 import { Hono as Hono7 } from "hono";
-import { getRequestListener } from "@hono/node-server";
 import { z as z5 } from "zod";
 
 // api/routes/session.ts
@@ -3108,45 +3107,62 @@ v1.route("/shop", shopRouter);
 v1.route("/upgrades", upgradesRouter);
 v1.route("/achievements", achievementsRouter);
 app.route("/v1", v1);
-var nodeListener = getRequestListener(app.fetch.bind(app));
 var universalHandler = async (req, res) => {
+  if (!res || typeof res.setHeader !== "function") {
+    return app.fetch(req);
+  }
   try {
-    if (res && typeof res.writeHead === "function") {
-      const matched = req.headers?.["x-matched-path"] || req.headers?.["x-invoke-path"] || req.headers?.["x-forwarded-uri"];
-      if (matched && (req.url === "/api" || req.url?.startsWith("/api?"))) {
-        const queryIdx = req.url.indexOf("?");
-        const query = queryIdx >= 0 ? req.url.slice(queryIdx) : "";
-        req.url = matched + query;
+    const protocol = req.headers?.["x-forwarded-proto"] || "https";
+    const host = req.headers?.["x-forwarded-host"] || req.headers?.host || "localhost";
+    const originalUrl = req.headers?.["x-matched-path"] || req.headers?.["x-invoke-path"] || req.headers?.["x-forwarded-uri"] || req.url || "/api";
+    const url = new URL(originalUrl, `${protocol}://${host}`);
+    const headers = new Headers();
+    if (req.headers) {
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (v) headers.set(k, Array.isArray(v) ? v.join(",") : v);
       }
-      return await nodeListener(req, res);
     }
-    return await app.fetch(req);
+    let body = void 0;
+    if (req.method !== "GET" && req.method !== "HEAD") {
+      const chunks = [];
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === "string" ? Buffer.from(chunk) : chunk);
+      }
+      if (chunks.length > 0) {
+        body = Buffer.concat(chunks);
+      }
+    }
+    const webReq = new Request(url.toString(), {
+      method: req.method || "GET",
+      headers,
+      body
+    });
+    const webRes = await app.fetch(webReq);
+    res.statusCode = webRes.status;
+    const cookies = typeof webRes.headers.getSetCookie === "function" ? webRes.headers.getSetCookie() : null;
+    for (const [k, v] of webRes.headers.entries()) {
+      if (k.toLowerCase() === "set-cookie" && cookies) continue;
+      res.setHeader(k, v);
+    }
+    if (cookies && cookies.length > 0) {
+      res.setHeader("set-cookie", cookies);
+    }
+    const buf = await webRes.arrayBuffer();
+    res.end(Buffer.from(buf));
   } catch (err) {
     const errorObj = err instanceof Error ? err : new Error(String(err));
-    console.error("SERVERLESS HANDLER UNCAUGHT ERROR:", errorObj);
-    if (res && typeof res.writeHead === "function") {
-      res.writeHead(500, { "Content-Type": "application/json" });
-      res.end(
-        JSON.stringify({
-          success: false,
-          error: {
-            code: "SERVERLESS_INVOCATION_ERROR",
-            message: errorObj.message,
-            stack: errorObj.stack
-          }
-        })
-      );
-      return;
-    }
-    return new Response(
+    console.error("SERVERLESS HANDLER ERROR:", errorObj);
+    res.statusCode = 500;
+    res.setHeader("Content-Type", "application/json");
+    res.end(
       JSON.stringify({
         success: false,
         error: {
           code: "SERVERLESS_INVOCATION_ERROR",
-          message: err?.message || String(err)
+          message: errorObj.message,
+          stack: errorObj.stack
         }
-      }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      })
     );
   }
 };

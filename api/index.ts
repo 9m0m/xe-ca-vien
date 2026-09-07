@@ -1,5 +1,4 @@
 import { Hono } from 'hono'
-import { getRequestListener } from '@hono/node-server'
 import { z } from 'zod'
 import { sessionRouter } from './routes/session'
 import { playerRouter } from './routes/player'
@@ -140,52 +139,85 @@ v1.route('/achievements', achievementsRouter)
 
 app.route('/v1', v1)
 
-const nodeListener = getRequestListener(app.fetch.bind(app))
-
 // Universal handler supporting Node.js Serverless Functions (req, res),
 // Vercel Edge Runtime, and Vite dev server.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const universalHandler = async (req: any, res?: any) => {
+  // Case A: Web Standard Request (Vite dev server, Vercel Edge)
+  if (!res || typeof res.setHeader !== 'function') {
+    return app.fetch(req)
+  }
+
+  // Case B: Node.js Serverless Function (IncomingMessage, ServerResponse)
   try {
-    if (res && typeof res.writeHead === 'function') {
-      const matched =
-        req.headers?.['x-matched-path'] ||
-        req.headers?.['x-invoke-path'] ||
-        req.headers?.['x-forwarded-uri']
-      if (matched && (req.url === '/api' || req.url?.startsWith('/api?'))) {
-        const queryIdx = req.url.indexOf('?')
-        const query = queryIdx >= 0 ? req.url.slice(queryIdx) : ''
-        req.url = matched + query
+    const protocol = req.headers?.['x-forwarded-proto'] || 'https'
+    const host = req.headers?.['x-forwarded-host'] || req.headers?.host || 'localhost'
+    const originalUrl =
+      req.headers?.['x-matched-path'] ||
+      req.headers?.['x-invoke-path'] ||
+      req.headers?.['x-forwarded-uri'] ||
+      req.url ||
+      '/api'
+
+    const url = new URL(originalUrl, `${protocol}://${host}`)
+
+    const headers = new Headers()
+    if (req.headers) {
+      for (const [k, v] of Object.entries(req.headers)) {
+        if (v) headers.set(k, Array.isArray(v) ? v.join(',') : (v as string))
       }
-      return await nodeListener(req, res)
     }
-    return await app.fetch(req)
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let body: any = undefined
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      const chunks: Buffer[] = []
+      for await (const chunk of req) {
+        chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : (chunk as Buffer))
+      }
+      if (chunks.length > 0) {
+        body = Buffer.concat(chunks)
+      }
+    }
+
+    const webReq = new Request(url.toString(), {
+      method: req.method || 'GET',
+      headers,
+      body,
+    })
+
+    const webRes = await app.fetch(webReq)
+
+    res.statusCode = webRes.status
+
+    const cookies =
+      typeof webRes.headers.getSetCookie === 'function' ? webRes.headers.getSetCookie() : null
+
+    for (const [k, v] of webRes.headers.entries()) {
+      if (k.toLowerCase() === 'set-cookie' && cookies) continue
+      res.setHeader(k, v)
+    }
+
+    if (cookies && cookies.length > 0) {
+      res.setHeader('set-cookie', cookies)
+    }
+
+    const buf = await webRes.arrayBuffer()
+    res.end(Buffer.from(buf))
   } catch (err: unknown) {
     const errorObj = err instanceof Error ? err : new Error(String(err))
-    console.error('SERVERLESS HANDLER UNCAUGHT ERROR:', errorObj)
-    if (res && typeof res.writeHead === 'function') {
-      res.writeHead(500, { 'Content-Type': 'application/json' })
-      res.end(
-        JSON.stringify({
-          success: false,
-          error: {
-            code: 'SERVERLESS_INVOCATION_ERROR',
-            message: errorObj.message,
-            stack: errorObj.stack,
-          },
-        }),
-      )
-      return
-    }
-    return new Response(
+    console.error('SERVERLESS HANDLER ERROR:', errorObj)
+    res.statusCode = 500
+    res.setHeader('Content-Type', 'application/json')
+    res.end(
       JSON.stringify({
         success: false,
         error: {
           code: 'SERVERLESS_INVOCATION_ERROR',
-          message: err?.message || String(err),
+          message: errorObj.message,
+          stack: errorObj.stack,
         },
       }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } },
     )
   }
 }
