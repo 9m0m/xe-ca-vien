@@ -75,5 +75,39 @@ export class BootScene extends Phaser.Scene {
     sausageGfx.fillRoundedRect(8, 12, 40, 8, 4)
     sausageGfx.generateTexture('sausage_red', 56, 40)
     sausageGfx.destroy()
+
+    // 7. Food: Đậu Hũ Cá (Fish tofu cube placeholder)
+    const tofuGfx = this.make.graphics({ x: 0, y: 0 })
+    tofuGfx.fillStyle(0xfde047, 1) // Warm pale tofu base
+    tofuGfx.fillRoundedRect(4, 4, 40, 40, 6)
+    tofuGfx.fillStyle(0xd97706, 0.6) // Golden fried crust edge
+    tofuGfx.strokeRoundedRect(4, 4, 40, 40, 6)
+    tofuGfx.generateTexture('fish_tofu', 48, 48)
+    tofuGfx.destroy()
+
+    // 8. Serving Plate (Dĩa Inox để món đã vớt)
+    const plateGfx = this.make.graphics({ x: 0, y: 0 })
+    plateGfx.fillStyle(0x475569, 1) // Inox rim
+    plateGfx.fillRoundedRect(0, 0, 360, 80, 10)
+    plateGfx.fillStyle(0x94a3b8, 1) // Inox plate base
+    plateGfx.fillRoundedRect(4, 4, 352, 72, 8)
+    plateGfx.fillStyle(0xe2e8f0, 0.4) // Subtle metallic sheen
+    plateGfx.fillRoundedRect(8, 8, 344, 24, 6)
+    plateGfx.generateTexture('serving_plate', 360, 80)
+    plateGfx.destroy()
+
+    // 9. Splash particle texture
+    const splashGfx = this.make.graphics({ x: 0, y: 0 })
+    splashGfx.fillStyle(0xfef08a, 1)
+    splashGfx.fillCircle(4, 4, 4)
+    splashGfx.generateTexture('oil_splash', 8, 8)
+    splashGfx.destroy()
+
+    // 10. Steam particle texture
+    const steamGfx = this.make.graphics({ x: 0, y: 0 })
+    steamGfx.fillStyle(0xffffff, 0.35)
+    steamGfx.fillCircle(8, 8, 8)
+    steamGfx.generateTexture('oil_steam', 16, 16)
+    steamGfx.destroy()
   }
 }

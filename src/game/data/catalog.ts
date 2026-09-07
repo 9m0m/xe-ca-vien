@@ -1,0 +1,80 @@
+import { FoodItemConfig } from '../types'
+
+export const INITIAL_FOOD_CATALOG: FoodItemConfig[] = [
+  {
+    id: 'fish_ball_classic',
+    displayNameVi: 'Cá viên',
+    category: 'vien',
+    shapeProfile: 'round',
+    cookTimeMs: 4000,
+    perfectWindowMs: 3000,
+    overcookTimeMs: 3000,
+    basePrice: 5000,
+    baseReward: 20,
+    unlockTier: 1,
+    spriteKey: 'fish_ball_classic',
+    servingStyle: 'skewer',
+    sauceTags: ['tuong_ot', 'tuong_den'],
+    quantityPerOrderRange: [1, 3],
+    enabled: true,
+  },
+  {
+    id: 'beef_ball_classic',
+    displayNameVi: 'Bò viên',
+    category: 'vien',
+    shapeProfile: 'round',
+    cookTimeMs: 4500,
+    perfectWindowMs: 3000,
+    overcookTimeMs: 3000,
+    basePrice: 6000,
+    baseReward: 25,
+    unlockTier: 1,
+    spriteKey: 'beef_ball_classic',
+    servingStyle: 'skewer',
+    sauceTags: ['tuong_ot', 'tuong_den', 'sa_te'],
+    quantityPerOrderRange: [1, 3],
+    enabled: true,
+  },
+  {
+    id: 'sausage_red',
+    displayNameVi: 'Xúc xích đỏ',
+    category: 'sausage',
+    shapeProfile: 'cylinder',
+    cookTimeMs: 5500,
+    perfectWindowMs: 3500,
+    overcookTimeMs: 3000,
+    basePrice: 8000,
+    baseReward: 30,
+    unlockTier: 1,
+    spriteKey: 'sausage_red',
+    servingStyle: 'skewer',
+    sauceTags: ['tuong_ot', 'mayo'],
+    quantityPerOrderRange: [1, 2],
+    enabled: true,
+  },
+  {
+    id: 'fish_tofu',
+    displayNameVi: 'Đậu hũ cá',
+    category: 'tofu_cake',
+    shapeProfile: 'cube',
+    cookTimeMs: 4000,
+    perfectWindowMs: 3000,
+    overcookTimeMs: 3000,
+    basePrice: 6000,
+    baseReward: 25,
+    unlockTier: 1,
+    spriteKey: 'fish_tofu',
+    servingStyle: 'skewer',
+    sauceTags: ['tuong_ot', 'tuong_den'],
+    quantityPerOrderRange: [1, 3],
+    enabled: true,
+  },
+]
+
+export const FOOD_CATALOG_MAP: Record<string, FoodItemConfig> = Object.fromEntries(
+  INITIAL_FOOD_CATALOG.map((item) => [item.id, item]),
+)
+
+export function getFoodConfig(foodId: string): FoodItemConfig | undefined {
+  return FOOD_CATALOG_MAP[foodId]
+}
