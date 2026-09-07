@@ -1,6 +1,6 @@
 import { Hono, Context } from 'hono'
 import { setCookie, getCookie } from 'hono/cookie'
-import { PlayerRepository } from '../../src/db/repository'
+import { PlayerRepository } from '../../src/db/repository.js'
 
 export const sessionRouter = new Hono()
 

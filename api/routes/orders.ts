@@ -1,8 +1,8 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { PlayerRepository } from '../../src/db/repository'
-import { getSessionToken } from './session'
+import { PlayerRepository } from '../../src/db/repository.js'
+import { getSessionToken } from './session.js'
 
 export const ordersRouter = new Hono()
 

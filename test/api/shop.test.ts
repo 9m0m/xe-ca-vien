@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { app } from '../../api/index.ts'
+import { app } from '../../api/index.js'
 
 describe('Shop & Food Unlocks API', () => {
   let sessionToken: string

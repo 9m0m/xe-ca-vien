@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { PlayerRepository } from '../../src/db/repository'
-import { getFoodConfig, getUnlockCost } from '../../src/game/data/catalog'
-import { getSessionToken } from './session'
+import { PlayerRepository } from '../../src/db/repository.js'
+import { getFoodConfig, getUnlockCost } from '../../src/game/data/catalog.js'
+import { getSessionToken } from './session.js'
 
 export const shopRouter = new Hono()
 

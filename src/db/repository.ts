@@ -1,5 +1,5 @@
 import { eq, and, sql } from 'drizzle-orm'
-import { getDb } from './client'
+import { getDb } from './client.js'
 import {
   players,
   playerSessions,
@@ -10,11 +10,20 @@ import {
   playerAchievements,
   orderRuns,
   activeOrders,
-} from './schema'
-import crypto from 'crypto'
-import { getNextUpgradeTier, getUpgradeConfig } from '../game/data/upgrades'
-import { ACHIEVEMENTS, checkAchievementUnlocked } from '../game/data/achievements'
-import { getFoodConfig, FULL_FOOD_CATALOG } from '../game/data/catalog'
+} from './schema.js'
+import { getNextUpgradeTier, getUpgradeConfig } from '../game/data/upgrades.js'
+import { ACHIEVEMENTS, checkAchievementUnlocked } from '../game/data/achievements.js'
+import { getFoodConfig, FULL_FOOD_CATALOG } from '../game/data/catalog.js'
+
+function generateRandomHex(bytes: number): string {
+  const arr = new Uint8Array(bytes)
+  globalThis.crypto.getRandomValues(arr)
+  return Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+function generateRandomUUID(): string {
+  return globalThis.crypto.randomUUID()
+}
 
 export interface CompletePlayerState {
   player: {
@@ -273,8 +282,8 @@ export class PlayerRepository {
    */
   static async createGuestPlayer(): Promise<CompletePlayerState> {
     const db = getDb()
-    const playerId = crypto.randomUUID()
-    const sessionToken = `sess_${crypto.randomBytes(24).toString('hex')}`
+    const playerId = generateRandomUUID()
+    const sessionToken = `sess_${generateRandomHex(24)}`
     const displayName = `Khách #${Math.floor(1000 + Math.random() * 9000)}`
     const starterFoods = ['fish_ball_classic', 'beef_ball_classic', 'sausage_red', 'fish_tofu']
     const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
@@ -289,7 +298,7 @@ export class PlayerRepository {
 
       // 2. Insert session
       await db.insert(playerSessions).values({
-        id: crypto.randomUUID(),
+        id: generateRandomUUID(),
         playerId,
         sessionToken,
         expiresAt,
@@ -297,7 +306,7 @@ export class PlayerRepository {
 
       // 3. Insert initial progress (10,000 đ starter capital)
       await db.insert(playerProgress).values({
-        id: crypto.randomUUID(),
+        id: generateRandomUUID(),
         playerId,
         coins: 10000,
         level: 1,
@@ -308,7 +317,7 @@ export class PlayerRepository {
       // 4. Insert starter food unlocks
       for (const foodId of starterFoods) {
         await db.insert(playerFoodUnlocks).values({
-          id: crypto.randomUUID(),
+          id: generateRandomUUID(),
           playerId,
           foodId,
         })
@@ -317,7 +326,7 @@ export class PlayerRepository {
       // 5. Insert starter upgrades
       for (const [key, tier] of Object.entries(DEFAULT_UPGRADES)) {
         await db.insert(playerUpgrades).values({
-          id: crypto.randomUUID(),
+          id: generateRandomUUID(),
           playerId,
           upgradeKey: key,
           tier,
@@ -326,7 +335,7 @@ export class PlayerRepository {
 
       // 6. Insert initial stats
       await db.insert(playerStats).values({
-        id: crypto.randomUUID(),
+        id: generateRandomUUID(),
         playerId,
         ordersServed: 0,
         perfectItemsFried: 0,
@@ -336,13 +345,13 @@ export class PlayerRepository {
       // In-memory fallback
       memStore.players.set(playerId, { id: playerId, displayName, isGuest: true })
       memStore.sessions.set(sessionToken, {
-        id: crypto.randomUUID(),
+        id: generateRandomUUID(),
         playerId,
         sessionToken,
         expiresAt,
       })
       memStore.progress.set(playerId, {
-        id: crypto.randomUUID(),
+        id: generateRandomUUID(),
         playerId,
         coins: 10000,
         level: 1,
@@ -594,7 +603,7 @@ export class PlayerRepository {
       }))
     }
 
-    const orderId = `ord_${Date.now()}_${crypto.randomBytes(6).toString('hex')}`
+    const orderId = `ord_${Date.now()}_${generateRandomHex(6)}`
     const requestedSauces = ['tuong_ot']
     const hasDuaChua = Math.random() < 0.5
     const patienceMs = 60000
@@ -818,7 +827,7 @@ export class PlayerRepository {
 
       // Insert order run
       await db.insert(orderRuns).values({
-        id: crypto.randomUUID(),
+        id: generateRandomUUID(),
         playerId,
         idempotencyKey,
         status: 'completed',
@@ -889,7 +898,7 @@ export class PlayerRepository {
           newlyUnlocked.push(ach.id)
           try {
             await db.insert(playerAchievements).values({
-              id: crypto.randomUUID(),
+              id: generateRandomUUID(),
               playerId,
               achievementId: ach.id,
               claimed: false,
@@ -918,7 +927,7 @@ export class PlayerRepository {
       }
 
       memStore.orderRuns.set(idempotencyKey, {
-        id: crypto.randomUUID(),
+        id: generateRandomUUID(),
         playerId,
         idempotencyKey,
         itemsJson: JSON.stringify(servedItems),
@@ -1044,7 +1053,7 @@ export class PlayerRepository {
 
         // 5. Insert ownership
         await tx.insert(playerFoodUnlocks).values({
-          id: crypto.randomUUID(),
+          id: generateRandomUUID(),
           playerId,
           foodId,
         })
@@ -1163,7 +1172,7 @@ export class PlayerRepository {
             )
         } else {
           await tx.insert(playerUpgrades).values({
-            id: crypto.randomUUID(),
+            id: generateRandomUUID(),
             playerId,
             upgradeKey,
             tier: nextTierConfig.tier,

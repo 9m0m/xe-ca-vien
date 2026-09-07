@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { app } from '../../api/index.ts'
+import { app } from '../../api/index.js'
 
 describe('Hono API v1 Health & Config', () => {
   it('should return health check status 200', async () => {

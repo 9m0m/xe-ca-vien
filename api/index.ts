@@ -1,12 +1,12 @@
 import { Hono } from 'hono'
 import { handle } from 'hono/vercel'
 import { z } from 'zod'
-import { sessionRouter } from './routes/session'
-import { playerRouter } from './routes/player'
-import { ordersRouter } from './routes/orders'
-import { shopRouter } from './routes/shop'
-import { upgradesRouter } from './routes/upgrades'
-import { achievementsRouter } from './routes/achievements'
+import { sessionRouter } from './routes/session.js'
+import { playerRouter } from './routes/player.js'
+import { ordersRouter } from './routes/orders.js'
+import { shopRouter } from './routes/shop.js'
+import { upgradesRouter } from './routes/upgrades.js'
+import { achievementsRouter } from './routes/achievements.js'
 
 export const config = {
   runtime: 'edge',

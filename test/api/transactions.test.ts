@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { app } from '../../api/index.ts'
+import { app } from '../../api/index.js'
 import { PlayerRepository } from '../../src/db/repository'
 
 describe('Purchase & Achievement Transaction Atomicity & Concurrency', () => {

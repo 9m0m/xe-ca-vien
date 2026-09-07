@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
 import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
-import { PlayerRepository } from '../../src/db/repository'
-import { CART_UPGRADES, getUpgradeConfig, getNextUpgradeTier } from '../../src/game/data/upgrades'
-import { getSessionToken } from './session'
+import { PlayerRepository } from '../../src/db/repository.js'
+import { CART_UPGRADES, getUpgradeConfig, getNextUpgradeTier } from '../../src/game/data/upgrades.js'
+import { getSessionToken } from './session.js'
 
 export const upgradesRouter = new Hono()
 
