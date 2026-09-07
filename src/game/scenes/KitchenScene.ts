@@ -388,6 +388,7 @@ export class KitchenScene extends Phaser.Scene {
   }
 
   private handleServeOrder() {
+    const currentOrder = this.cookingManager.getCurrentOrder()
     const evalResult = this.cookingManager.serveCurrentOrder()
 
     if (!evalResult.success) {
@@ -395,11 +396,13 @@ export class KitchenScene extends Phaser.Scene {
       return
     }
 
-    // Update Zustand store with awarded coins and XP
-    const { coins, xp, setPlayerStats } = useAppStore.getState()
-    setPlayerStats({
-      coins: coins + evalResult.coinsEarned,
-      xp: xp + evalResult.xpEarned,
+    // Submit reward to server-authoritative backend
+    const { submitOrderReward } = useAppStore.getState()
+    submitOrderReward({
+      orderId: currentOrder?.orderId ?? `ord_${Date.now()}`,
+      items: (currentOrder?.items ?? []).map((it) => ({ foodId: it.foodId, state: 'perfect' })),
+      coinsEarned: evalResult.coinsEarned,
+      xpEarned: evalResult.xpEarned,
     })
 
     // Show celebration toast

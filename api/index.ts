@@ -1,6 +1,9 @@
 import { Hono } from 'hono'
 import { handle } from 'hono/vercel'
 import { z } from 'zod'
+import { sessionRouter } from './routes/session'
+import { playerRouter } from './routes/player'
+import { ordersRouter } from './routes/orders'
 
 export const config = {
   runtime: 'nodejs',
@@ -89,6 +92,11 @@ v1.get('/game/config', (c) => {
     data,
   })
 })
+
+// Sub-routers
+v1.route('/session', sessionRouter)
+v1.route('/player', playerRouter)
+v1.route('/orders', ordersRouter)
 
 app.route('/v1', v1)
 

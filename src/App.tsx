@@ -7,17 +7,14 @@ import { useAppStore } from './store/useAppStore'
 
 export function App() {
   const [isInitializing, setIsInitializing] = useState(true)
-  const { setIsLoading } = useAppStore()
+  const { initSession } = useAppStore()
 
   useEffect(() => {
-    // Initial warmup / asset preparation simulation
-    const timer = setTimeout(() => {
+    // Initialize server-authoritative guest session
+    initSession().finally(() => {
       setIsInitializing(false)
-      setIsLoading(false)
-    }, 600)
-
-    return () => clearTimeout(timer)
-  }, [setIsLoading])
+    })
+  }, [initSession])
 
   return (
     <ErrorBoundary>
