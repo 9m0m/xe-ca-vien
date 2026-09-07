@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { app } from '@/../api/index'
+import { app } from '../../api/index.ts'
 import { CookingManager } from '@/game/systems/CookingManager'
 import { getFoodConfig } from '@/game/data/catalog'
 

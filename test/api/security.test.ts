@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { app } from '../../api/index'
+import { app } from '../../api/index.ts'
 import { getDb } from '../../src/db/client'
 
 describe('Security, Authority & Adversarial API Tests', () => {

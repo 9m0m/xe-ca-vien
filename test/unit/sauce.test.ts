@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { CookingManager } from '../../src/game/systems/CookingManager'
 import { SAUCE_CATALOG, getSauceConfig } from '../../src/game/data/sauces'
+import { getFoodConfig } from '../../src/game/data/catalog'
 
 describe('Sauce System and Satisfaction Scoring', () => {
   let manager: CookingManager
@@ -57,7 +58,8 @@ describe('Sauce System and Satisfaction Scoring', () => {
     for (const item of order.items) {
       for (let i = 0; i < item.quantity; i++) {
         const slot = manager.addFoodToPan(item.foodId)!
-        manager.update(5000) // perfect cook
+        const cfg = getFoodConfig(item.foodId)!
+        manager.update(cfg.cookTimeMs + 100) // guaranteed in perfect window
         manager.removeFoodFromPan(slot)
       }
     }

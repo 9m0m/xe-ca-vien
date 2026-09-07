@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { app } from '../../api/index'
+import { app } from '../../api/index.ts'
 
 describe('Server-Authoritative Persistence & Sessions', () => {
   let sessionToken: string
