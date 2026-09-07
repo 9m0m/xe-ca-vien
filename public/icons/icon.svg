@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Dark Slate Background with rounded corners -->
+  <rect width="512" height="512" rx="100" fill="#0f172a" />
+  
+  <!-- Outer Street Glow -->
+  <circle cx="256" cy="256" r="210" fill="#1e293b" />
+  <circle cx="256" cy="256" r="180" fill="#d97706" opacity="0.15" />
+
+  <!-- Stainless Steel Pan Rim -->
+  <circle cx="256" cy="260" r="170" fill="#64748b" stroke="#334155" stroke-width="8" />
+  <circle cx="256" cy="260" r="150" fill="#94a3b8" />
+  <!-- Boiling Oil Wok Base -->
+  <circle cx="256" cy="260" r="138" fill="#b45309" stroke="#78350f" stroke-width="4" />
+  <circle cx="256" cy="260" r="126" fill="#d97706" />
+
+  <!-- Oil Bubble Rings -->
+  <circle cx="210" cy="230" r="10" fill="#fef08a" opacity="0.6" />
+  <circle cx="290" cy="280" r="14" fill="#fef08a" opacity="0.5" />
+  <circle cx="310" cy="220" r="8" fill="#fef08a" opacity="0.7" />
+
+  <!-- Bamboo Skewer -->
+  <line x1="120" y1="392" x2="392" y2="120" stroke="#78350f" stroke-width="12" stroke-linecap="round" />
+  <line x1="116" y1="396" x2="135" y2="377" stroke="#92400e" stroke-width="10" stroke-linecap="round" />
+
+  <!-- Skewered Cá Viên Ball 1 (Bottom Left) -->
+  <ellipse cx="190" cy="322" rx="42" ry="40" fill="#d97706" stroke="#78350f" stroke-width="4" />
+  <ellipse cx="184" cy="316" rx="36" ry="34" fill="#f59e0b" />
+  <path d="M 170 300 Q 185 308 178 325" stroke="#fffbeb" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8" />
+  <!-- Chili Sauce Drizzle -->
+  <path d="M 180 305 Q 195 320 205 335" stroke="#dc2626" stroke-width="6" stroke-linecap="round" fill="none" />
+
+  <!-- Skewered Cá Viên Ball 2 (Center) -->
+  <ellipse cx="256" cy="256" rx="46" ry="44" fill="#d97706" stroke="#78350f" stroke-width="4" />
+  <ellipse cx="250" cy="250" rx="40" ry="38" fill="#f59e0b" />
+  <path d="M 235 232 Q 250 240 242 260" stroke="#fffbeb" stroke-width="5" stroke-linecap="round" fill="none" opacity="0.8" />
+  <!-- Black Bean Sauce Drizzle -->
+  <path d="M 242 240 Q 262 252 270 270" stroke="#2b1810" stroke-width="7" stroke-linecap="round" fill="none" />
+
+  <!-- Skewered Cá Viên Ball 3 (Top Right) -->
+  <ellipse cx="322" cy="190" rx="42" ry="40" fill="#d97706" stroke="#78350f" stroke-width="4" />
+  <ellipse cx="316" cy="184" rx="36" ry="34" fill="#f59e0b" />
+  <path d="M 302 168 Q 317 176 310 193" stroke="#fffbeb" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.8" />
+  <!-- Chili Sauce Splash -->
+  <circle cx="335" cy="198" r="7" fill="#dc2626" />
+</svg>

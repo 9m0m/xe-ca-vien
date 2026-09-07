@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   Coins,
   Volume2,
@@ -10,6 +10,8 @@ import {
   Store,
   Wrench,
   Trophy,
+  WifiOff,
+  Download,
 } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { CollectionModal } from '../modals/CollectionModal'
@@ -17,11 +19,17 @@ import { ShopModal } from '../modals/ShopModal'
 import { UpgradesModal } from '../modals/UpgradesModal'
 import { AchievementsModal } from '../modals/AchievementsModal'
 
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
 interface GameShellProps {
   children: React.ReactNode
 }
 
 export const GameShell: React.FC<GameShellProps> = ({ children }) => {
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const {
     coins,
     level,
@@ -35,7 +43,22 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
     toggleMusic,
     musicVolume,
     setMusicVolume,
+    isOnline,
+    setIsOnline,
+    initSession,
   } = useAppStore()
+
+  useEffect(() => {
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault()
+      setInstallPrompt(e as BeforeInstallPromptEvent)
+    }
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
+    }
+  }, [])
 
   return (
     <div className="relative flex h-full w-full items-center justify-center bg-slate-950 select-none overflow-hidden">
@@ -47,24 +70,28 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
         {/* Top Street-Food Cart Awning Bar */}
         <div className="h-2 w-full bg-gradient-to-r from-red-700 via-amber-200 to-red-700 flex-shrink-0" />
 
-        {/* Top HUD: Inox Header */}
-        <header className="flex h-14 w-full items-center justify-between px-2.5 bg-slate-800 border-b border-slate-700 flex-shrink-0 z-20">
+        {/* Top HUD: Inox Header with Safe Area support */}
+        <header className="flex h-14 min-h-[3.5rem] w-full items-center justify-between px-2 min-[380px]:px-2.5 bg-slate-800 border-b border-slate-700 flex-shrink-0 z-20 pt-[env(safe-area-inset-top,0px)]">
           {/* Level / Brand */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex h-8 items-center gap-1 px-2 rounded bg-slate-900 border border-slate-700 text-amber-400 font-bold text-xs">
-              <Flame className="h-3.5 w-3.5 text-amber-500" />
+          <div className="flex items-center gap-1 min-[380px]:gap-1.5">
+            <div className="flex h-7 min-[380px]:h-8 items-center gap-1 px-1.5 min-[380px]:px-2 rounded bg-slate-900 border border-slate-700 text-amber-400 font-bold text-xs">
+              <Flame className="h-3.5 w-3.5 text-amber-500 flex-shrink-0" />
               <span>Cấp {level}</span>
             </div>
-            <span className="font-bold text-xs text-slate-100 tracking-wide hidden min-[360px]:inline">
+            <span className="font-bold text-xs text-slate-100 tracking-wide hidden sm:inline">
               Xe Cá Viên
             </span>
           </div>
 
           {/* Currency / Stats & Action Modals */}
-          <div className="flex items-center gap-1.5">
-            <div className="flex h-8 items-center gap-1 px-2.5 rounded bg-slate-900 border border-amber-600/50 text-amber-300 font-bold text-xs shadow-inner">
-              <Coins className="h-3.5 w-3.5 text-amber-400" />
-              <span>{coins.toLocaleString('vi-VN')} đ</span>
+          <div className="flex items-center gap-1 min-[380px]:gap-1.5">
+            <div className="flex h-7 min-[380px]:h-8 items-center gap-1 px-1.5 min-[380px]:px-2.5 rounded bg-slate-900 border border-amber-600/50 text-amber-300 font-bold text-xs shadow-inner">
+              <Coins className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+              <span className="tabular-nums">
+                {coins >= 1000000
+                  ? `${(coins / 1000000).toFixed(1)}M`
+                  : `${coins.toLocaleString('vi-VN')} đ`}
+              </span>
             </div>
 
             {/* Collection Trigger */}
@@ -72,9 +99,9 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
               onClick={() => setActiveModal('collection')}
               aria-label="Thực đơn bộ sưu tập"
               title="Thực Đơn"
-              className="btn-inox h-8 w-8 !p-0"
+              className="btn-inox h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 !p-0"
             >
-              <BookOpen className="h-4 w-4 text-slate-700" />
+              <BookOpen className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-slate-700" />
             </button>
 
             {/* Shop Trigger */}
@@ -82,9 +109,9 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
               onClick={() => setActiveModal('shop')}
               aria-label="Cửa hàng món mới"
               title="Mua Món Mới"
-              className="btn-inox h-8 w-8 !p-0"
+              className="btn-inox h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 !p-0"
             >
-              <Store className="h-4 w-4 text-slate-700" />
+              <Store className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-slate-700" />
             </button>
 
             {/* Upgrades Trigger */}
@@ -92,9 +119,9 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
               onClick={() => setActiveModal('upgrades')}
               aria-label="Nâng cấp xe cá viên"
               title="Nâng Cấp Xe"
-              className="btn-inox h-8 w-8 !p-0"
+              className="btn-inox h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 !p-0"
             >
-              <Wrench className="h-4 w-4 text-slate-700" />
+              <Wrench className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-slate-700" />
             </button>
 
             {/* Achievements Trigger */}
@@ -102,21 +129,21 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
               onClick={() => setActiveModal('achievements')}
               aria-label="Thành tựu và kỷ lục"
               title="Thành Tựu"
-              className="btn-inox h-8 w-8 !p-0"
+              className="btn-inox h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 !p-0"
             >
-              <Trophy className="h-4 w-4 text-slate-700" />
+              <Trophy className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-slate-700" />
             </button>
 
             {/* Audio Toggle (Quick Mute) */}
             <button
               onClick={toggleSound}
               aria-label={soundEnabled ? 'Tắt âm thanh' : 'Bật âm thanh'}
-              className="btn-inox h-8 w-8 !p-0"
+              className="btn-inox h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 !p-0"
             >
               {soundEnabled ? (
-                <Volume2 className="h-4 w-4 text-slate-700" />
+                <Volume2 className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-slate-700" />
               ) : (
-                <VolumeX className="h-4 w-4 text-red-600" />
+                <VolumeX className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-red-600" />
               )}
             </button>
 
@@ -124,20 +151,42 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
             <button
               onClick={() => setActiveModal('settings')}
               aria-label="Cài đặt trò chơi"
-              className="btn-inox h-8 w-8 !p-0"
+              className="btn-inox h-7 w-7 min-[380px]:h-8 min-[380px]:w-8 !p-0"
             >
-              <Settings className="h-4 w-4 text-slate-700" />
+              <Settings className="h-3.5 w-3.5 min-[380px]:h-4 min-[380px]:w-4 text-slate-700" />
             </button>
           </div>
         </header>
+
+        {/* Offline indicator banner with reconnect / retry */}
+        {!isOnline && (
+          <div className="flex items-center justify-between px-2.5 py-1 bg-amber-950/95 border-b border-amber-600 text-amber-200 text-xs z-30 animate-in fade-in">
+            <div className="flex items-center gap-1.5 text-[11px] min-[380px]:text-xs">
+              <WifiOff className="h-3.5 w-3.5 text-amber-400 flex-shrink-0" />
+              <span>Ngoại tuyến • Đang lưu dữ liệu cục bộ</span>
+            </div>
+            <button
+              onClick={() => {
+                const online = typeof navigator !== 'undefined' ? navigator.onLine : true
+                setIsOnline(online)
+                if (online) {
+                  initSession()
+                }
+              }}
+              className="px-2 py-0.5 rounded bg-amber-600 hover:bg-amber-500 text-[10px] font-bold text-slate-900 transition-colors"
+            >
+              Thử lại
+            </button>
+          </div>
+        )}
 
         {/* Phaser Game Container viewport */}
         <main className="relative flex-1 w-full h-full overflow-hidden bg-slate-950 touch-none">
           {children}
         </main>
 
-        {/* Bottom Cart Base Trim */}
-        <footer className="h-4 w-full bg-slate-800 border-t border-slate-700 flex items-center justify-between px-3 text-[10px] text-slate-400 flex-shrink-0">
+        {/* Bottom Cart Base Trim with Safe Area Bottom */}
+        <footer className="h-auto min-h-[1.5rem] py-1 w-full bg-slate-800 border-t border-slate-700 flex items-center justify-between px-3 text-[10px] text-slate-400 flex-shrink-0 pb-[env(safe-area-inset-bottom,0px)]">
           <span>v0.1.0 • Chuẩn vỉa hè Sài Gòn</span>
           <span>Bản quyền © Xe Cá Viên</span>
         </footer>
@@ -213,6 +262,24 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
                   />
                 </div>
               </div>
+
+              {/* PWA Install Button when prompt is available */}
+              {installPrompt && (
+                <div className="pt-2 border-t border-slate-700">
+                  <button
+                    onClick={() => {
+                      installPrompt.prompt()
+                      installPrompt.userChoice.finally(() => {
+                        setInstallPrompt(null)
+                      })
+                    }}
+                    className="btn-inox w-full flex items-center justify-center gap-2 !bg-amber-500 hover:!bg-amber-400 !text-slate-950 font-bold !border-amber-600"
+                  >
+                    <Download className="h-4 w-4" />
+                    <span>Cài Đặt Ứng Dụng (PWA)</span>
+                  </button>
+                </div>
+              )}
 
               <div className="pt-2 border-t border-slate-700 flex justify-end">
                 <button onClick={() => setActiveModal('none')} className="btn-inox w-full">

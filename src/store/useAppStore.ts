@@ -280,54 +280,56 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   submitOrderReward: async (payload) => {
-    const { sessionToken, coins, xp, stats } = get()
+    const { sessionToken, coins, xp, stats, isOnline } = get()
     const idempotencyKey = `ord_${payload.orderId}_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`
 
-    try {
-      const res = await fetch('/api/v1/orders/complete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
-        },
-        body: JSON.stringify({
-          orderId: payload.orderId,
-          idempotencyKey,
-          items: payload.items,
-          coinsEarned: payload.coinsEarned,
-          xpEarned: payload.xpEarned,
-        }),
-      })
+    if (isOnline) {
+      try {
+        const res = await fetch('/api/v1/orders/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+          },
+          body: JSON.stringify({
+            orderId: payload.orderId,
+            idempotencyKey,
+            items: payload.items,
+            coinsEarned: payload.coinsEarned,
+            xpEarned: payload.xpEarned,
+          }),
+        })
 
-      if (res.ok) {
-        const json = await res.json()
-        if (json.success && json.data) {
-          const {
-            newTotalCoins,
-            newXp,
-            newLevel,
-            stats: serverStats,
-            newlyUnlockedAchievements,
-          } = json.data
-          set((s) => ({
-            coins: newTotalCoins,
-            xp: newXp,
-            level: newLevel,
-            stats: serverStats || s.stats,
-            unlockedAchievements: newlyUnlockedAchievements
-              ? Array.from(new Set([...s.unlockedAchievements, ...newlyUnlockedAchievements]))
-              : s.unlockedAchievements,
-          }))
-          return {
-            success: true,
-            newCoins: newTotalCoins,
-            newXp,
-            newLevel,
+        if (res.ok) {
+          const json = await res.json()
+          if (json.success && json.data) {
+            const {
+              newTotalCoins,
+              newXp,
+              newLevel,
+              stats: serverStats,
+              newlyUnlockedAchievements,
+            } = json.data
+            set((s) => ({
+              coins: newTotalCoins,
+              xp: newXp,
+              level: newLevel,
+              stats: serverStats || s.stats,
+              unlockedAchievements: newlyUnlockedAchievements
+                ? Array.from(new Set([...s.unlockedAchievements, ...newlyUnlockedAchievements]))
+                : s.unlockedAchievements,
+            }))
+            return {
+              success: true,
+              newCoins: newTotalCoins,
+              newXp,
+              newLevel,
+            }
           }
         }
+      } catch (err) {
+        console.warn('Network error during reward sync:', err)
       }
-    } catch (err) {
-      console.warn('Network error during reward sync:', err)
     }
 
     // Local fallback if offline

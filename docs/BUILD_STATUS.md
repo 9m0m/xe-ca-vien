@@ -231,10 +231,49 @@
 
 ---
 
+### Phase 9 — Responsive / PWA / Accessibility (COMPLETE)
+
+- **Mobile Safe Areas & Viewport Responsiveness**:
+  - `src/styles/tokens.css` & `src/index.css`: Added safe-area variables (`--safe-area-top`, `--safe-area-bottom`, etc.) and utility classes (`.safe-area-top`, `.safe-area-bottom`).
+  - Viewport fit (`viewport-fit=cover`) enabled in `index.html`.
+  - Header handles notch inset top padding (`pt-[env(safe-area-inset-top,0px)]`); footer base trim handles home indicator padding (`pb-[env(safe-area-inset-bottom,0px)]`).
+  - Ultra-compact 320px responsive scaling: Header buttons, badges, and coin indicators dynamically size down from 32px to 28px (`h-7 w-7 min-[380px]:h-8 min-[380px]:w-8`) ensuring zero overflow or wrapping on iPhone SE 1st gen and narrow Android devices.
+- **Progressive Web App (PWA) Foundation**:
+  - `public/manifest.webmanifest`: Standalone PWA manifest with portrait orientation, `#0f172a` street-slate theme color, and metadata.
+  - Procedural asset generation for icons: `public/icons/icon.svg`, `public/icons/icon-192.png`, `public/icons/icon-512.png`, and `public/icons/icon-maskable-512.png`.
+  - `public/sw.js`: Native Service Worker with precaching of core app shell, Stale-While-Revalidate caching for static chunks, network bypass for `/api/` endpoints, and navigation fallback to `/index.html`.
+  - PWA Install prompt integration: Catches `beforeinstallprompt` event and surfaces an install button in `SettingsModal`.
+- **Offline / Reconnect Resilience UX**:
+  - Live window `online` / `offline` event monitoring synced to `useAppStore`.
+  - Ambient street warning banner rendered when disconnected (`WifiOff` icon + "Ngoại tuyến • Đang lưu dữ liệu cục bộ" + "Thử lại" manual retry trigger).
+  - Server reward submission automatically checks `isOnline` and falls back to local optimistic state without throwing uncaught network errors.
+- **Verification Commands & Results**:
+  - `pnpm run typecheck`: Passed (0 errors)
+  - `pnpm run lint`: Passed (0 errors, 0 warnings)
+  - `pnpm run format`: Passed (all files match Prettier style)
+  - `pnpm run test`: Passed (12 test files, 49 tests passed)
+  - `pnpm run build`: Passed (production bundle ready with PWA assets in `dist/`)
+
+---
+
+## Current Architecture Decisions
+
+1. **Frontend**: React 19 + TypeScript + Vite + Phaser 3 + Zustand.
+2. **Backend**: Hono on Vercel Functions (`/api/v1/...`).
+3. **Food & Sauce Simulation**: Deterministic data-driven modeling in `CookingManager` and `catalog.ts` / `sauces.ts`.
+4. **Authority**: Progression, unlocks, upgrades, achievements, and rewards are strictly server-authoritative.
+5. **Database**: PostgreSQL on Neon via Drizzle ORM.
+6. **Art System**: Centralized asset registry adhering strictly to `docs/ART_BIBLE.md` with mobile-first silhouette verification.
+7. **Audio & Juice**: Zero-asset procedural Web Audio synthesis with tactile mobile haptics and prefers-reduced-motion safety.
+8. **PWA & Offline**: Native Service Worker offline shell caching, manifest, safe-area insets, and optimistic offline state progression.
+
+---
+
 ## Next Phase
 
-- **Phase 9 — Responsive / PWA / Accessibility**:
-  - Cross-device responsive viewport handling (320px ultra-compact, 390px canonical phone, tablet, and desktop wideview).
-  - Mobile safe-area padding handling (`env(safe-area-inset-top)` / `env(safe-area-inset-bottom)`).
-  - Progressive Web App manifest (`manifest.webmanifest`), street-cart app icons, and offline caching shell.
-  - Offline / reconnect resilience indicators in UI.
+- **Phase 10 — Release Hardening**:
+  - End-to-end critical path automated flow test (Guest init -> cook order -> serve -> upgrade pan -> persist).
+  - Rate limiting / security headers on abuse-prone endpoints.
+  - PostgreSQL database index validation on Drizzle schema.
+  - Production environment variable validation.
+  - Vercel build verification and deployment readiness report.

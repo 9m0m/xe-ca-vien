@@ -7,14 +7,38 @@ import { useAppStore } from './store/useAppStore'
 
 export function App() {
   const [isInitializing, setIsInitializing] = useState(true)
-  const { initSession } = useAppStore()
+  const { initSession, setIsOnline } = useAppStore()
 
   useEffect(() => {
-    // Initialize server-authoritative guest session
+    // 1. Initialize server-authoritative guest session
     initSession().finally(() => {
       setIsInitializing(false)
     })
-  }, [initSession])
+
+    // 2. Track online/offline status
+    const handleOnline = () => setIsOnline(true)
+    const handleOffline = () => setIsOnline(false)
+
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+
+    // 3. Register PWA Service Worker
+    if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker
+        .register('/sw.js')
+        .then((reg) => {
+          reg.update().catch(() => {})
+        })
+        .catch((err) => {
+          console.warn('Service Worker registration skipped/failed:', err)
+        })
+    }
+
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [initSession, setIsOnline])
 
   return (
     <ErrorBoundary>
