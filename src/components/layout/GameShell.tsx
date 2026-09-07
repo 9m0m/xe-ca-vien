@@ -1,6 +1,8 @@
 import React from 'react'
-import { Coins, Volume2, VolumeX, Settings, X, Flame } from 'lucide-react'
+import { Coins, Volume2, VolumeX, Settings, X, Flame, BookOpen, Store } from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
+import { CollectionModal } from '../modals/CollectionModal'
+import { ShopModal } from '../modals/ShopModal'
 
 interface GameShellProps {
   children: React.ReactNode
@@ -33,24 +35,44 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
         <div className="h-2 w-full bg-gradient-to-r from-red-700 via-amber-200 to-red-700 flex-shrink-0" />
 
         {/* Top HUD: Inox Header */}
-        <header className="flex h-14 w-full items-center justify-between px-3 bg-slate-800 border-b border-slate-700 flex-shrink-0 z-20">
+        <header className="flex h-14 w-full items-center justify-between px-2.5 bg-slate-800 border-b border-slate-700 flex-shrink-0 z-20">
           {/* Level / Brand */}
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 items-center gap-1 px-2.5 rounded bg-slate-900 border border-slate-700 text-amber-400 font-bold text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="flex h-8 items-center gap-1 px-2 rounded bg-slate-900 border border-slate-700 text-amber-400 font-bold text-xs">
               <Flame className="h-3.5 w-3.5 text-amber-500" />
               <span>Cấp {level}</span>
             </div>
-            <span className="font-bold text-sm text-slate-100 tracking-wide hidden min-[360px]:inline">
+            <span className="font-bold text-xs text-slate-100 tracking-wide hidden min-[360px]:inline">
               Xe Cá Viên
             </span>
           </div>
 
-          {/* Currency / Stats */}
-          <div className="flex items-center gap-2">
-            <div className="flex h-8 items-center gap-1.5 px-3 rounded bg-slate-900 border border-amber-600/50 text-amber-300 font-bold text-xs shadow-inner">
-              <Coins className="h-4 w-4 text-amber-400" />
+          {/* Currency / Stats & Action Modals */}
+          <div className="flex items-center gap-1.5">
+            <div className="flex h-8 items-center gap-1 px-2.5 rounded bg-slate-900 border border-amber-600/50 text-amber-300 font-bold text-xs shadow-inner">
+              <Coins className="h-3.5 w-3.5 text-amber-400" />
               <span>{coins.toLocaleString('vi-VN')} đ</span>
             </div>
+
+            {/* Collection Trigger */}
+            <button
+              onClick={() => setActiveModal('collection')}
+              aria-label="Thực đơn bộ sưu tập"
+              title="Thực Đơn"
+              className="btn-inox h-8 w-8 !p-0"
+            >
+              <BookOpen className="h-4 w-4 text-slate-700" />
+            </button>
+
+            {/* Shop Trigger */}
+            <button
+              onClick={() => setActiveModal('shop')}
+              aria-label="Cửa hàng món mới"
+              title="Mua Món Mới"
+              className="btn-inox h-8 w-8 !p-0"
+            >
+              <Store className="h-4 w-4 text-slate-700" />
+            </button>
 
             {/* Audio Toggle (Quick Mute) */}
             <button
@@ -167,6 +189,12 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
             </div>
           </div>
         )}
+
+        {/* Collection / Food Menu Modal */}
+        {activeModal === 'collection' && <CollectionModal onClose={() => setActiveModal('none')} />}
+
+        {/* Shop Modal */}
+        {activeModal === 'shop' && <ShopModal onClose={() => setActiveModal('none')} />}
       </div>
     </div>
   )

@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 
-export type ModalType = 'none' | 'settings' | 'pause' | 'help'
+export type ModalType = 'none' | 'settings' | 'pause' | 'help' | 'collection' | 'shop'
 
 interface AppState {
   // Player state (display cached from server)
@@ -26,6 +26,7 @@ interface AppState {
 
   // Actions
   initSession: () => Promise<void>
+  unlockFood: (foodId: string) => Promise<{ success: boolean; message?: string }>
   submitOrderReward: (payload: {
     orderId: string
     items: { foodId: string; state: 'raw' | 'cooking' | 'perfect' | 'overcooked' }[]
@@ -106,6 +107,38 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (err) {
       console.warn('Fallback offline mode:', err)
       set({ isLoading: false })
+    }
+  },
+
+  unlockFood: async (foodId: string) => {
+    const { sessionToken, unlockedFoods } = get()
+    try {
+      const res = await fetch('/api/v1/shop/unlock', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+        },
+        body: JSON.stringify({ foodId }),
+      })
+
+      const json = await res.json()
+      if (json.success && json.data) {
+        set({
+          coins: json.data.newCoins,
+          unlockedFoods: json.data.unlockedFoods,
+        })
+        return { success: true }
+      }
+      return { success: false, message: json.error?.message }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Lỗi kết nối máy chủ'
+      // Local fallback for offline mode
+      if (!unlockedFoods.includes(foodId)) {
+        set((s) => ({ unlockedFoods: [...s.unlockedFoods, foodId] }))
+        return { success: true }
+      }
+      return { success: false, message }
     }
   },
 

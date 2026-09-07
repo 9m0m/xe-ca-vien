@@ -1,7 +1,7 @@
 import Phaser from 'phaser'
 import { CookingManager } from '../systems/CookingManager'
 import { CookingState, FryingItem } from '../types'
-import { getFoodConfig, INITIAL_FOOD_CATALOG } from '../data/catalog'
+import { getFoodConfig } from '../data/catalog'
 import { useAppStore } from '@/store/useAppStore'
 
 interface SlotDisplay {
@@ -255,9 +255,14 @@ export class KitchenScene extends Phaser.Scene {
     this.plateContainer = this.add.container(centerX, plateY)
   }
 
+  private trayItemsContainer?: Phaser.GameObjects.Container
+  private currentTrayPage = 0
+  private unsubscribeStore?: () => void
+
   private setupFoodPrepTray(centerX: number, trayY: number) {
     this.add.image(centerX, trayY, 'prep_tray').setOrigin(0.5)
 
+    // Tray Header Title
     this.add
       .text(centerX, trayY - 65, 'KHAY NGUYÊN LIỆU (CHẠM ĐỂ THẢ VÀO CHẢO)', {
         fontFamily: 'system-ui, sans-serif',
@@ -267,19 +272,83 @@ export class KitchenScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    const slotStartX = centerX - 130
+    this.trayItemsContainer = this.add.container(centerX, trayY)
+
+    // Left Page Arrow (<)
+    const prevBtn = this.add
+      .text(centerX - 170, trayY, '◀', {
+        fontSize: '16px',
+        color: '#f59e0b',
+      })
+      .setOrigin(0.5)
+      .setInteractive({ cursor: 'pointer' })
+
+    prevBtn.on('pointerdown', () => {
+      if (this.currentTrayPage > 0) {
+        this.currentTrayPage--
+        this.refreshFoodPrepTray()
+      }
+    })
+
+    // Right Page Arrow (>)
+    const nextBtn = this.add
+      .text(centerX + 170, trayY, '▶', {
+        fontSize: '16px',
+        color: '#f59e0b',
+      })
+      .setOrigin(0.5)
+      .setInteractive({ cursor: 'pointer' })
+
+    nextBtn.on('pointerdown', () => {
+      const { unlockedFoods } = useAppStore.getState()
+      const totalFoods = unlockedFoods.length > 0 ? unlockedFoods.length : 4
+      const maxPages = Math.ceil(totalFoods / 4)
+      if (this.currentTrayPage < maxPages - 1) {
+        this.currentTrayPage++
+        this.refreshFoodPrepTray()
+      }
+    })
+
+    // Render initial tray
+    this.refreshFoodPrepTray()
+
+    // Subscribe to store updates when new foods are purchased
+    this.unsubscribeStore = useAppStore.subscribe((state, prev) => {
+      if (state.unlockedFoods.length !== prev.unlockedFoods.length) {
+        this.refreshFoodPrepTray()
+        this.cookingManager.generateCustomerOrder(state.unlockedFoods)
+        this.refreshOrderDisplay()
+      }
+    })
+  }
+
+  private refreshFoodPrepTray() {
+    if (!this.trayItemsContainer) return
+    this.trayItemsContainer.removeAll(true)
+
+    const { unlockedFoods } = useAppStore.getState()
+    const activeFoodIds =
+      unlockedFoods.length > 0
+        ? unlockedFoods
+        : ['fish_ball_classic', 'beef_ball_classic', 'sausage_red', 'fish_tofu']
+
+    const itemsPerPage = 4
+    const pageStart = this.currentTrayPage * itemsPerPage
+    const pageItems = activeFoodIds.slice(pageStart, pageStart + itemsPerPage)
+
+    const slotStartX = -130
     const slotSpacing = 86
 
-    INITIAL_FOOD_CATALOG.slice(0, 4).forEach((food, index) => {
+    pageItems.forEach((foodId, index) => {
+      const food = getFoodConfig(foodId)
+      if (!food) return
+
       const itemX = slotStartX + index * slotSpacing
-      const itemY = trayY
 
-      const sprite = this.add
-        .image(itemX, itemY, food.spriteKey)
-        .setInteractive({ cursor: 'pointer' })
+      const sprite = this.add.image(itemX, 0, food.spriteKey).setInteractive({ cursor: 'pointer' })
 
-      this.add
-        .text(itemX, itemY + 32, food.displayNameVi, {
+      const label = this.add
+        .text(itemX, 32, food.displayNameVi, {
           fontFamily: 'system-ui, sans-serif',
           fontSize: '10px',
           fontStyle: 'bold',
@@ -287,8 +356,12 @@ export class KitchenScene extends Phaser.Scene {
         })
         .setOrigin(0.5)
 
-      // Tap to fry
-      sprite.on('pointerdown', () => this.handleDropFoodToPan(food.id, itemX, itemY))
+      // Tap to drop into hot pan
+      const screenX = this.scale.width / 2 + itemX
+      const screenY = this.scale.height - 85
+      sprite.on('pointerdown', () => this.handleDropFoodToPan(food.id, screenX, screenY))
+
+      this.trayItemsContainer?.add([sprite, label])
     })
   }
 
@@ -502,6 +575,7 @@ export class KitchenScene extends Phaser.Scene {
   }
 
   destroy() {
+    this.unsubscribeStore?.()
     this.bubbleEmitter?.destroy()
   }
 }

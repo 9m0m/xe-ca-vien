@@ -47,28 +47,43 @@
   - `POST /api/v1/orders/complete`: Zod-validated reward submission enforcing `idempotencyKey` against replay attacks or double-rewarding.
 - **Client Session Hydration**:
   - `useAppStore`: Implemented `initSession()` and `submitOrderReward()`, keeping progression server-authoritative and persisting across page refreshes.
+- **Verification**: Typecheck, lint, format, tests, and production build all passed.
+
+---
+
+### Phase 4 — Large Content Catalog (COMPLETE)
+- **Full 60-Item Catalog**:
+  - All 60 authentic street-food snack items from `docs/FOOD_CATALOG.md` (Sections A through F) wired into typed data structures across 5 unlock tiers and 6 categories (`vien`, `tofu_cake`, `sausage`, `surimi`, `dumpling`, `cheese_crispy`).
+  - Procedural geometric textures in `BootScene` for all shape profiles (`round`, `cylinder`, `cube`, `dumpling`, `flat`, `specialty`) with distinct silhouettes.
+- **Collection Book & Shop Modals**:
+  - `CollectionModal` ("Thực Đơn Xe Cá Viên"): Tab filtering by food category, cook times, reward values, and unlocked/locked badges.
+  - `ShopModal` ("Chợ Đầu Mối Vỉa Hè"): Browse locked foods and purchase unlocks with coins.
+- **Server-Authoritative Food Unlocks**:
+  - `POST /api/v1/shop/unlock`: Deducts coins, records to `player_food_unlocks`, returns updated player balance.
+- **Phaser Tray Pagination**:
+  - Prep tray in Phaser supports page navigation arrows (`◀` / `▶`) to cycle through all unlocked street foods in groups of 4.
+  - Customer orders dynamically request any foods the player has unlocked.
 - **Verification Commands & Results**:
   - `pnpm run typecheck`: Passed (0 errors)
   - `pnpm run lint`: Passed (0 errors, 0 warnings)
   - `pnpm run format`: Passed (all files match Prettier style)
-  - `pnpm run test`: Passed (4 test files, 19 tests passed)
-  - `pnpm run build`: Passed (clean vendor and app chunks)
+  - `pnpm run test`: Passed (6 test files, 26 tests passed)
+  - `pnpm run build`: Passed (clean vendor, app, and Phaser chunks)
 
 ---
 
 ## Current Architecture Decisions
 1. **Frontend**: React 19 + TypeScript + Vite + Phaser 3 + Zustand.
 2. **Backend**: Hono on Vercel Functions (`/api/v1/...`).
-3. **Database**: PostgreSQL hosted on Neon with Drizzle ORM + generated migrations.
-4. **Authority**: Server is the sole authority for currency, level, and unlocks. Browser receives verified state.
-5. **Idempotency**: All reward submissions require a unique idempotency key logged in `order_runs`.
+3. **Food Catalog**: 60 data-driven items conforming to a shared `FoodItemConfig` contract. No per-food classes or custom components.
+4. **Database**: PostgreSQL hosted on Neon with Drizzle ORM + migrations.
+5. **Authority**: Progression and unlocks are server-authoritative.
 
 ---
 
 ## Next Phase
-- **Phase 4 — Large content catalog**:
-  - Wire full `docs/FOOD_CATALOG.md` (60 Vietnamese street food items) into typed data catalog across 5 unlock tiers and 6 categories (`vien`, `tofu_cake`, `sausage`, `surimi`, `dumpling`, `cheese_crispy`).
-  - Add Collection / Menu Book modal in React UI (`Bộ Sưu Tập Món Ăn`) to view unlocked and locked street foods with details, cook times, and rewards.
-  - Add Street-Cart Food Shop modal (`Cửa Hàng Món Mới`) to purchase and unlock new street foods with earned coins.
-  - Implement server-authoritative unlock endpoint (`POST /api/v1/shop/unlock`).
-  - Wire at least 20+ playable items with procedural textures into the frying gameplay.
+- **Phase 5 — Sauce / Serving Depth**:
+  - Implement Southern Vietnamese sauce selection system (Tương ớt, Tương đen, Mayonnaise, Sốt me, Sa tế, Nước mắm).
+  - Skewer vs tray serving presentation.
+  - Customer preference matching (sauce compatibility, garnish/dưa chua).
+  - Customer satisfaction grading (speed + cook quality + sauce accuracy).

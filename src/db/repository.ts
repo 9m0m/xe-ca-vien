@@ -334,4 +334,80 @@ export class PlayerRepository {
       }
     }
   }
+
+  /**
+   * Unlocks a new food item from the shop with coin deduction.
+   */
+  static async unlockFood(
+    playerId: string,
+    foodId: string,
+    cost: number,
+  ): Promise<{ success: boolean; newCoins: number; unlockedFoods: string[] }> {
+    const db = getDb()
+
+    if (db) {
+      // 1. Check if already unlocked
+      const existing = await db
+        .select()
+        .from(playerFoodUnlocks)
+        .where(eq(playerFoodUnlocks.playerId, playerId))
+
+      const unlockedIds = existing.map((e) => e.foodId)
+      if (unlockedIds.includes(foodId)) {
+        throw new Error('ALREADY_UNLOCKED')
+      }
+
+      // 2. Check balance
+      const progressRes = await db
+        .select()
+        .from(playerProgress)
+        .where(eq(playerProgress.playerId, playerId))
+        .limit(1)
+
+      const prog = progressRes[0]
+      if (!prog || prog.coins < cost) {
+        throw new Error('INSUFFICIENT_COINS')
+      }
+
+      // 3. Deduct coins and add unlock
+      const newCoins = prog.coins - cost
+      await db
+        .update(playerProgress)
+        .set({ coins: newCoins, updatedAt: new Date() })
+        .where(eq(playerProgress.playerId, playerId))
+
+      await db.insert(playerFoodUnlocks).values({
+        id: crypto.randomUUID(),
+        playerId,
+        foodId,
+      })
+
+      return {
+        success: true,
+        newCoins,
+        unlockedFoods: [...unlockedIds, foodId],
+      }
+    } else {
+      // In-memory fallback
+      const unlocked = memStore.unlocks.get(playerId) || []
+      if (unlocked.includes(foodId)) {
+        throw new Error('ALREADY_UNLOCKED')
+      }
+
+      const prog = memStore.progress.get(playerId)
+      if (!prog || prog.coins < cost) {
+        throw new Error('INSUFFICIENT_COINS')
+      }
+
+      prog.coins -= cost
+      unlocked.push(foodId)
+      memStore.unlocks.set(playerId, unlocked)
+
+      return {
+        success: true,
+        newCoins: prog.coins,
+        unlockedFoods: [...unlocked],
+      }
+    }
+  }
 }
