@@ -11,7 +11,7 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: 'http://127.0.0.1:4173',
+    baseURL: process.env.PLAYWRIGHT_TEST_BASE_URL || 'http://127.0.0.1:4173',
     trace: 'on-first-retry',
     channel: 'chrome',
   },
@@ -41,13 +41,15 @@ export default defineConfig({
       },
     },
   ],
-  webServer: {
-    command: 'pnpm dev --port 4173 --host 127.0.0.1',
-    port: 4173,
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000,
-    env: {
-      ALLOW_IN_MEMORY_DB: 'true',
-    },
-  },
+  webServer: process.env.PLAYWRIGHT_TEST_BASE_URL
+    ? undefined
+    : {
+        command: 'pnpm dev --port 4173 --host 127.0.0.1',
+        port: 4173,
+        reuseExistingServer: !process.env.CI,
+        timeout: 30_000,
+        env: {
+          ALLOW_IN_MEMORY_DB: 'true',
+        },
+      },
 })
