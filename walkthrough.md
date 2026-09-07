@@ -1,7 +1,7 @@
 # Xe Cá Viên (Vietnamese Street Food Tycoon) — Complete Technical Walkthrough & Codex Review Document
 
 **Repository Remote:** `https://github.com/9m0m/xe-ca-vien.git`  
-**Current Upstream Branch:** `main` (Synchronized at HEAD commit `5d4c0a6`)  
+**Current Upstream Branch:** `main` (Synchronized at HEAD commit `c3e22e5`)  
 **Deployment Gate 3 Status:** `CODE READY — DEPLOYMENT VALIDATION INCOMPLETE`  
 **Target Platform:** Mobile-First Web PWA & Vercel Serverless (Viewport 390×844 reference, responsive down to 320px, desktop bounded canvas)  
 **Primary Tech Stack:** React 19, TypeScript strict mode, Vite 6, Tailwind CSS 3, Phaser 3, Zustand 5, Hono 4, Drizzle ORM, Neon PostgreSQL (`@neondatabase/serverless`), Web Audio API, PWA Service Worker.
