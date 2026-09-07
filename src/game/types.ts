@@ -51,6 +51,9 @@ export interface CustomerOrder {
   customerName: string
   items: OrderItem[]
   totalItems: number
+  requestedSauces: string[]
+  hasDuaChua: boolean
+  servingStyle: ServingStyle
   createdAt: number
   patienceMs: number
 }
@@ -63,5 +66,9 @@ export interface ServeEvaluation {
   acceptableCount: number
   undercookedCount: number
   overcookedCount: number
+  satisfactionScore: number
+  sauceScore: number
+  speedScore: number
+  reputationEarned: number
   feedback: string
 }

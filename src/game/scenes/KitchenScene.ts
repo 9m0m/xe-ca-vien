@@ -2,6 +2,7 @@ import Phaser from 'phaser'
 import { CookingManager } from '../systems/CookingManager'
 import { CookingState, FryingItem } from '../types'
 import { getFoodConfig } from '../data/catalog'
+import { getSauceConfig } from '../data/sauces'
 import { useAppStore } from '@/store/useAppStore'
 
 interface SlotDisplay {
@@ -48,7 +49,7 @@ export class KitchenScene extends Phaser.Scene {
     this.setupOrderDisplay(width)
 
     // 3. Frying Pan Section (Center)
-    const panY = 270
+    const panY = 240
     this.panImage = this.add.image(width / 2, panY, 'pan_surface').setOrigin(0.5)
 
     // Simmering oil bubble particles
@@ -76,12 +77,16 @@ export class KitchenScene extends Phaser.Scene {
     // 4. Setup 6 Pan Slot Displays
     this.setupPanSlots(width / 2, panY)
 
-    // 5. Serving Plate Section (Between Pan and Tray)
-    const plateY = 445
+    // 5. Setup Sauce Bar (Between Pan and Plate)
+    const sauceY = 360
+    this.setupSauceBar(width / 2, sauceY)
+
+    // 6. Serving Plate Section (Between Sauce and Tray)
+    const plateY = 460
     this.setupServingPlate(width / 2, plateY)
 
-    // 6. Food Prep Tray (Bottom)
-    const trayY = height - 85
+    // 7. Food Prep Tray (Bottom)
+    const trayY = height - 80
     this.setupFoodPrepTray(width / 2, trayY)
 
     // 7. Temporary Feedback text banner
@@ -128,11 +133,12 @@ export class KitchenScene extends Phaser.Scene {
 
     if (!order) return
 
-    // Customer Name Label
+    // Customer Name & Serving Style Label
+    const styleLabel = order.servingStyle === 'tray' ? '🍽️ Khay' : '🍢 Xiên'
     const nameText = this.add
-      .text(-width / 2 + 24, -40, `👤 ${order.customerName}`, {
+      .text(-width / 2 + 24, -40, `👤 ${order.customerName}  •  ${styleLabel}`, {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '12px',
+        fontSize: '11px',
         fontStyle: 'bold',
         color: '#f59e0b',
       })
@@ -148,14 +154,31 @@ export class KitchenScene extends Phaser.Scene {
       .join('  •  ')
 
     const itemsText = this.add
-      .text(-width / 2 + 24, -18, `Yêu cầu: ${orderSummary}`, {
+      .text(-width / 2 + 24, -20, `Món: ${orderSummary}`, {
         fontFamily: 'system-ui, sans-serif',
-        fontSize: '13px',
+        fontSize: '12px',
         fontStyle: 'bold',
         color: '#f8fafc',
       })
       .setOrigin(0, 0)
     this.orderContainer.add(itemsText)
+
+    // Requested Sauces & Garnish
+    const sauceNames = order.requestedSauces
+      .map((s) => getSauceConfig(s)?.displayNameVi ?? s)
+      .join(', ')
+    const pickleText = order.hasDuaChua ? ' + Dưa chua' : ''
+    const sauceSummary = sauceNames ? `Sốt: ${sauceNames}${pickleText}` : 'Không cần sốt'
+
+    const sauceReqText = this.add
+      .text(-width / 2 + 24, 0, sauceSummary, {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#fde047',
+      })
+      .setOrigin(0, 0)
+    this.orderContainer.add(sauceReqText)
 
     // Serve Button ("Giao Món")
     const btnWidth = 110
@@ -236,6 +259,64 @@ export class KitchenScene extends Phaser.Scene {
         stateText,
       })
     }
+  }
+
+  private setupSauceBar(centerX: number, sauceY: number) {
+    // Title
+    this.add
+      .text(centerX, sauceY - 32, 'QUẦY NƯỚC SỐT (CHẠM ĐỂ RƯỚI VÀO DĨA):', {
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: '9px',
+        fontStyle: 'bold',
+        color: '#fef08a',
+      })
+      .setOrigin(0.5)
+
+    const sauces = [
+      { id: 'tuong_ot', label: 'Tương ớt', sprite: 'bottle_chili' },
+      { id: 'tuong_den', label: 'Tương đen', sprite: 'bottle_black' },
+      { id: 'mayo', label: 'Mayo', sprite: 'bottle_mayo' },
+      { id: 'sot_me', label: 'Sốt me', sprite: 'bottle_tamarind' },
+      { id: 'dua_chua', label: 'Dưa chua', sprite: 'bowl_pickle' },
+    ]
+
+    const spacing = 68
+    const startX = centerX - ((sauces.length - 1) * spacing) / 2
+
+    sauces.forEach((s, idx) => {
+      const bottleX = startX + idx * spacing
+      const bottle = this.add.image(bottleX, sauceY, s.sprite).setInteractive({ cursor: 'pointer' })
+
+      this.add
+        .text(bottleX, sauceY + 28, s.label, {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '9px',
+          fontStyle: 'bold',
+          color: '#e2e8f0',
+        })
+        .setOrigin(0.5)
+
+      bottle.on('pointerdown', () => {
+        // Squeeze bounce
+        this.tweens.add({
+          targets: bottle,
+          scaleY: 0.8,
+          scaleX: 1.15,
+          yoyo: true,
+          duration: 90,
+          ease: 'Quad.easeInOut',
+        })
+
+        if (s.id === 'dua_chua') {
+          const added = this.cookingManager.togglePlateDuaChua()
+          this.showToast(added ? '🥒 Đã thêm Dưa chua vào dĩa!' : 'Đã bỏ Dưa chua')
+        } else {
+          const added = this.cookingManager.togglePlateSauce(s.id)
+          this.showToast(added ? `🥫 Đã rưới ${s.label} vào dĩa!` : `Đã bỏ ${s.label}`)
+        }
+        this.refreshPlateDisplay()
+      })
+    })
   }
 
   private setupServingPlate(centerX: number, plateY: number) {
@@ -458,6 +539,27 @@ export class KitchenScene extends Phaser.Scene {
 
       this.plateContainer?.add([sprite, badge])
     })
+
+    // Render Applied Sauces & Garnish bar on plate
+    const appliedSauces = this.cookingManager.getSelectedSauces()
+    const hasDuaChua = this.cookingManager.getHasDuaChua()
+
+    const sauceLabels = appliedSauces.map((s) => getSauceConfig(s)?.displayNameVi ?? s)
+    if (hasDuaChua) sauceLabels.push('Dưa chua')
+
+    if (sauceLabels.length > 0) {
+      const saucePlateText = this.add
+        .text(0, 24, `Đã rưới: ${sauceLabels.join(' + ')}`, {
+          fontFamily: 'system-ui, sans-serif',
+          fontSize: '9px',
+          fontStyle: 'bold',
+          color: '#fef08a',
+          stroke: '#000000',
+          strokeThickness: 2,
+        })
+        .setOrigin(0.5)
+      this.plateContainer?.add(saucePlateText)
+    }
   }
 
   private handleServeOrder() {
@@ -478,9 +580,10 @@ export class KitchenScene extends Phaser.Scene {
       xpEarned: evalResult.xpEarned,
     })
 
-    // Show celebration toast
+    // Show satisfaction celebration toast
+    const tipText = evalResult.satisfactionScore >= 80 ? ' • Thưởng Tip +25%!' : ''
     this.showToast(
-      `🎉 ${evalResult.feedback}\n+${evalResult.coinsEarned.toLocaleString('vi-VN')} đ  (+${evalResult.xpEarned} XP)`,
+      `🎉 ${evalResult.feedback}\n+${evalResult.coinsEarned.toLocaleString('vi-VN')} đ  (+${evalResult.xpEarned} XP)\nHài lòng: ${evalResult.satisfactionScore}%${tipText}`,
     )
 
     // Refresh display

@@ -248,5 +248,44 @@ export class BootScene extends Phaser.Scene {
     snailGfx.fillCircle(28, 20, 10)
     snailGfx.generateTexture('shape_specialty_snail', 48, 48)
     snailGfx.destroy()
+
+    // 26. Sauce Squeeze Bottles
+    const makeBottle = (key: string, bodyColor: number, capColor: number) => {
+      const bGfx = this.make.graphics({ x: 0, y: 0 })
+      // Bottle Nozzle Tip
+      bGfx.fillStyle(capColor, 1)
+      bGfx.fillTriangle(14, 2, 9, 14, 19, 14)
+      // Bottle Neck
+      bGfx.fillStyle(0x94a3b8, 1)
+      bGfx.fillRect(10, 14, 8, 4)
+      // Bottle Body
+      bGfx.fillStyle(bodyColor, 1)
+      bGfx.fillRoundedRect(4, 18, 20, 30, 4)
+      // Translucent highlight
+      bGfx.fillStyle(0xffffff, 0.3)
+      bGfx.fillRect(7, 20, 3, 24)
+      bGfx.generateTexture(key, 28, 50)
+      bGfx.destroy()
+    }
+
+    makeBottle('bottle_chili', 0xdc2626, 0xef4444)
+    makeBottle('bottle_black', 0x2b1810, 0x78350f)
+    makeBottle('bottle_mayo', 0xfef3c7, 0xfbbf24)
+    makeBottle('bottle_tamarind', 0x92400e, 0xb45309)
+    makeBottle('bottle_sate', 0xb91c1c, 0xf87171)
+
+    // 27. Garnish: Dưa Chua Bowl (Pickle plate)
+    const pickleGfx = this.make.graphics({ x: 0, y: 0 })
+    pickleGfx.fillStyle(0x0284c7, 1) // Blue plastic street bowl
+    pickleGfx.fillCircle(18, 18, 16)
+    pickleGfx.fillStyle(0xf8fafc, 1) // White inner
+    pickleGfx.fillCircle(18, 18, 13)
+    pickleGfx.fillStyle(0x84cc16, 1) // Green cucumber slices
+    pickleGfx.fillCircle(14, 15, 6)
+    pickleGfx.fillCircle(22, 17, 6)
+    pickleGfx.fillStyle(0xf97316, 1) // Orange pickled carrot sliver
+    pickleGfx.fillRect(13, 19, 10, 3)
+    pickleGfx.generateTexture('bowl_pickle', 36, 36)
+    pickleGfx.destroy()
   }
 }

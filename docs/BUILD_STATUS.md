@@ -63,27 +63,51 @@
 - **Phaser Tray Pagination**:
   - Prep tray in Phaser supports page navigation arrows (`◀` / `▶`) to cycle through all unlocked street foods in groups of 4.
   - Customer orders dynamically request any foods the player has unlocked.
+- **Verification**: Typecheck, lint, format, tests, and production build all passed.
+
+---
+
+### Phase 5 — Sauce / Serving Depth (COMPLETE)
+- **Southern Vietnamese Sauce System**:
+  - Catalog in `src/game/data/sauces.ts`: Tương ớt (`tuong_ot`), Tương đen (`tuong_den`), Mayonnaise (`mayo`), Sốt me (`sot_me`), Sa tế (`sa_te`), Dưa chua ăn kèm (`dua_chua`).
+  - Procedural squeeze bottle sprites and pickle bowl in `BootScene`.
+- **Interactive Sauce Bar in Phaser**:
+  - Sauce bar positioned between frying pan and serving plate.
+  - Tap squeeze bottle -> tactile tilt tween animation, squirt particle effect, toggles sauce on current plate.
+  - Visual plate feedback: displays active sauce tags (`Đã rưới: Tương ớt + Mayonnaise + Dưa chua`).
+- **Customer Preferences & Satisfaction Scoring**:
+  - Orders generate requested sauces and serving styles (`skewer` vs `tray`).
+  - Multi-dimensional satisfaction score (0–100%):
+    - Frying cook perfection (0–50 pts)
+    - Sauce & pickle accuracy (0–30 pts)
+    - Service speed within patience limit (0–20 pts)
+  - Satisfaction >= 80% awards +25% tip coins bonus and +5 reputation.
 - **Verification Commands & Results**:
   - `pnpm run typecheck`: Passed (0 errors)
   - `pnpm run lint`: Passed (0 errors, 0 warnings)
   - `pnpm run format`: Passed (all files match Prettier style)
-  - `pnpm run test`: Passed (6 test files, 26 tests passed)
-  - `pnpm run build`: Passed (clean vendor, app, and Phaser chunks)
+  - `pnpm run test`: Passed (7 test files, 30 tests passed)
+  - `pnpm run build`: Passed (production bundle ready)
 
 ---
 
 ## Current Architecture Decisions
 1. **Frontend**: React 19 + TypeScript + Vite + Phaser 3 + Zustand.
 2. **Backend**: Hono on Vercel Functions (`/api/v1/...`).
-3. **Food Catalog**: 60 data-driven items conforming to a shared `FoodItemConfig` contract. No per-food classes or custom components.
-4. **Database**: PostgreSQL hosted on Neon with Drizzle ORM + migrations.
-5. **Authority**: Progression and unlocks are server-authoritative.
+3. **Food & Sauce Simulation**: Deterministic data-driven modeling in `CookingManager` and `catalog.ts` / `sauces.ts`.
+4. **Authority**: Progression, unlocks, and rewards are server-authoritative.
+5. **Database**: PostgreSQL on Neon via Drizzle ORM.
 
 ---
 
 ## Next Phase
-- **Phase 5 — Sauce / Serving Depth**:
-  - Implement Southern Vietnamese sauce selection system (Tương ớt, Tương đen, Mayonnaise, Sốt me, Sa tế, Nước mắm).
-  - Skewer vs tray serving presentation.
-  - Customer preference matching (sauce compatibility, garnish/dưa chua).
-  - Customer satisfaction grading (speed + cook quality + sauce accuracy).
+- **Phase 6 — Progression & Upgrades**:
+  - Cart upgrades catalog:
+    - Pan capacity (expand from 6 to 8 or 10 slots)
+    - Oil temperature controller (widens perfect frying window)
+    - Cart presentation awning (boosts customer patience timer)
+    - Auto-skewer/plating station
+  - Player level milestones & experience curve.
+  - Street-food cart achievements system (`Thợ Chiên Tân Binh`, `Đệ Nhất Cá Viên`, `Khách Quen Vạn Người Mê`).
+  - Upgrades shop modal in React UI (`Nâng Cấp Xe Cá Viên`).
+  - Server-authoritative upgrade purchase endpoint (`POST /api/v1/upgrades/purchase`).

@@ -1,10 +1,19 @@
-import { CustomerOrder, FoodItemConfig, FryingItem, PlateItem, ServeEvaluation } from '../types'
-import { getFoodConfig, INITIAL_FOOD_CATALOG } from '../data/catalog'
+import {
+  CustomerOrder,
+  FoodItemConfig,
+  FryingItem,
+  PlateItem,
+  ServeEvaluation,
+  ServingStyle,
+} from '../types'
+import { getFoodConfig, FULL_FOOD_CATALOG } from '../data/catalog'
 
 export class CookingManager {
   private maxPanSlots: number
   private slots: (FryingItem | null)[]
   private plateItems: PlateItem[] = []
+  private selectedSauces: string[] = []
+  private hasDuaChua = false
   private currentOrder: CustomerOrder | null = null
 
   private customerNames = [
@@ -14,6 +23,8 @@ export class CookingManager {
     'Anh tài xế công nghệ',
     'Cô hàng xóm',
     'Bạn sinh viên',
+    'Bác xe ôm đầu ngõ',
+    'Cặp đôi đi dạo',
   ]
 
   constructor(maxPanSlots = 6) {
@@ -32,6 +43,34 @@ export class CookingManager {
 
   public getPlateItems(): PlateItem[] {
     return [...this.plateItems]
+  }
+
+  public getSelectedSauces(): string[] {
+    return [...this.selectedSauces]
+  }
+
+  public getHasDuaChua(): boolean {
+    return this.hasDuaChua
+  }
+
+  public togglePlateSauce(sauceId: string): boolean {
+    if (this.selectedSauces.includes(sauceId)) {
+      this.selectedSauces = this.selectedSauces.filter((s) => s !== sauceId)
+      return false
+    } else {
+      this.selectedSauces.push(sauceId)
+      return true
+    }
+  }
+
+  public togglePlateDuaChua(): boolean {
+    this.hasDuaChua = !this.hasDuaChua
+    return this.hasDuaChua
+  }
+
+  public clearSauces(): void {
+    this.selectedSauces = []
+    this.hasDuaChua = false
   }
 
   public getCurrentOrder(): CustomerOrder | null {
@@ -111,16 +150,17 @@ export class CookingManager {
 
   public clearPlate(): void {
     this.plateItems = []
+    this.clearSauces()
   }
 
   public generateCustomerOrder(availableFoodIds?: string[]): CustomerOrder {
     const validFoods = availableFoodIds
-      ? INITIAL_FOOD_CATALOG.filter((f) => availableFoodIds.includes(f.id))
-      : INITIAL_FOOD_CATALOG
+      ? FULL_FOOD_CATALOG.filter((f) => availableFoodIds.includes(f.id))
+      : FULL_FOOD_CATALOG
 
-    const activeFoods = validFoods.length > 0 ? validFoods : INITIAL_FOOD_CATALOG
+    const activeFoods = validFoods.length > 0 ? validFoods : FULL_FOOD_CATALOG
 
-    // Pick 1 to 2 distinct items for early orders
+    // Pick 1 to 2 distinct items for early/mid orders
     const count = Math.min(activeFoods.length, Math.random() < 0.6 ? 1 : 2)
     const shuffled = [...activeFoods].sort(() => 0.5 - Math.random())
     const selected = shuffled.slice(0, count)
@@ -135,13 +175,33 @@ export class CookingManager {
     const totalItems = items.reduce((sum, it) => sum + it.quantity, 0)
     const customerName = this.customerNames[Math.floor(Math.random() * this.customerNames.length)]
 
+    // Determine sauces from requested foods compatibility
+    const allSaucePool = Array.from(new Set(selected.flatMap((f) => f.sauceTags)))
+    const requestedSauces: string[] = []
+    if (allSaucePool.length > 0) {
+      requestedSauces.push(allSaucePool[Math.floor(Math.random() * allSaucePool.length)])
+      if (allSaucePool.length > 1 && Math.random() < 0.5) {
+        const secondSauce = allSaucePool.find((s) => !requestedSauces.includes(s))
+        if (secondSauce) requestedSauces.push(secondSauce)
+      }
+    }
+
+    const hasDuaChua = Math.random() < 0.45
+
+    // Serving style: skewer for small orders, tray for combo or tray items
+    const hasTrayItem = selected.some((f) => f.servingStyle === 'tray')
+    const servingStyle: ServingStyle = totalItems > 3 || hasTrayItem ? 'tray' : 'skewer'
+
     const order: CustomerOrder = {
       orderId: `order_${Date.now()}`,
       customerName,
       items,
       totalItems,
+      requestedSauces,
+      hasDuaChua,
+      servingStyle,
       createdAt: Date.now(),
-      patienceMs: 45000,
+      patienceMs: 50000,
     }
 
     this.currentOrder = order
@@ -158,6 +218,10 @@ export class CookingManager {
         acceptableCount: 0,
         undercookedCount: 0,
         overcookedCount: 0,
+        satisfactionScore: 0,
+        sauceScore: 0,
+        speedScore: 0,
+        reputationEarned: 0,
         feedback: 'Không có đơn hàng nào đang chờ!',
       }
     }
@@ -191,7 +255,7 @@ export class CookingManager {
 
           if (item.state === 'perfect') {
             perfectCount++
-            totalCoins += Math.round(basePrice * 1.3) // 30% golden bonus tip
+            totalCoins += Math.round(basePrice * 1.3)
             totalXp += Math.round(baseReward * 1.5)
           } else if (item.state === 'cooking') {
             acceptableCount++
@@ -224,10 +288,47 @@ export class CookingManager {
         acceptableCount,
         undercookedCount,
         overcookedCount,
+        satisfactionScore: 0,
+        sauceScore: 0,
+        speedScore: 0,
+        reputationEarned: 0,
         feedback: 'Chưa đủ món theo yêu cầu của khách!',
       }
     }
 
+    // Calculate Multi-dimensional Satisfaction Score:
+    // 1. Cook Score (0 - 50 pts)
+    const perfectRatio = perfectCount / matchedPlateIndices.length
+    let cookScore = Math.round(perfectRatio * 50)
+    if (undercookedCount > 0) cookScore = Math.max(0, cookScore - 25)
+    if (overcookedCount > 0) cookScore = Math.max(0, cookScore - 30)
+
+    // 2. Sauce Score (0 - 30 pts)
+    let sauceScore = 20
+    if (this.currentOrder.requestedSauces.length > 0) {
+      let matchedSauces = 0
+      for (const sauce of this.currentOrder.requestedSauces) {
+        if (this.selectedSauces.includes(sauce)) matchedSauces++
+      }
+      const sauceRatio = matchedSauces / this.currentOrder.requestedSauces.length
+      sauceScore = Math.round(sauceRatio * 30)
+    }
+    if (this.currentOrder.hasDuaChua) {
+      if (this.hasDuaChua) {
+        sauceScore = Math.min(30, sauceScore + 5)
+      } else {
+        sauceScore = Math.max(0, sauceScore - 10)
+      }
+    }
+
+    // 3. Speed Score (0 - 20 pts)
+    const elapsed = Date.now() - this.currentOrder.createdAt
+    const remainingRatio = Math.max(0, 1 - elapsed / this.currentOrder.patienceMs)
+    const speedScore = Math.round(remainingRatio * 20)
+
+    const satisfactionScore = Math.max(0, Math.min(100, cookScore + sauceScore + speedScore))
+
+    // Handle severe defects
     if (undercookedCount > 0) {
       return {
         success: false,
@@ -237,6 +338,10 @@ export class CookingManager {
         acceptableCount,
         undercookedCount,
         overcookedCount,
+        satisfactionScore,
+        sauceScore,
+        speedScore,
+        reputationEarned: -3,
         feedback: 'Khách phàn nàn: Món còn sống, chưa chín giòn!',
       }
     }
@@ -250,17 +355,31 @@ export class CookingManager {
         acceptableCount,
         undercookedCount,
         overcookedCount,
+        satisfactionScore,
+        sauceScore,
+        speedScore,
+        reputationEarned: -4,
         feedback: 'Khách phàn nàn: Món bị chiên quá lửa, khét rồi!',
       }
     }
 
-    // High quality serve!
-    let feedback = 'Khách rất thích món ăn!'
-    if (perfectCount === matchedPlateIndices.length) {
-      feedback = 'Xuất sắc! Chiên vàng ươm hoàn hảo!'
+    // Generous Tip Bonus for High Satisfaction (>= 80%)
+    let feedback = 'Khách hài lòng với món ăn!'
+    let reputationEarned = 2
+    if (satisfactionScore >= 80) {
+      const tipBonus = Math.round(totalCoins * 0.25)
+      totalCoins += tipBonus
+      reputationEarned = 5
+      feedback = 'Khách mê mẩn! Thưởng thêm tiền tip!'
+    } else if (satisfactionScore < 50) {
+      reputationEarned = 0
+      feedback = 'Khách ăn tạm được nhưng hơi thiếu vị.'
     }
 
-    // Generate next order
+    // Reset plate sauces
+    this.clearSauces()
+
+    // Generate next customer order
     this.generateCustomerOrder()
 
     return {
@@ -271,6 +390,10 @@ export class CookingManager {
       acceptableCount,
       undercookedCount,
       overcookedCount,
+      satisfactionScore,
+      sauceScore,
+      speedScore,
+      reputationEarned,
       feedback,
     }
   }
