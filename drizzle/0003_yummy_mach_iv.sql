@@ -1,0 +1,1 @@
+CREATE INDEX "idx_order_runs_player" ON "order_runs" USING btree ("player_id");

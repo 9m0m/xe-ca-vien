@@ -99,6 +99,7 @@ export const orderRuns = pgTable(
   },
   (table) => ({
     idempotencyIdx: index('idx_order_runs_idempotency').on(table.idempotencyKey),
+    playerOrderIdx: index('idx_order_runs_player').on(table.playerId),
   }),
 )
 

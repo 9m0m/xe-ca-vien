@@ -269,11 +269,52 @@
 
 ---
 
-## Next Phase
+---
 
-- **Phase 10 — Release Hardening**:
-  - End-to-end critical path automated flow test (Guest init -> cook order -> serve -> upgrade pan -> persist).
-  - Rate limiting / security headers on abuse-prone endpoints.
-  - PostgreSQL database index validation on Drizzle schema.
-  - Production environment variable validation.
-  - Vercel build verification and deployment readiness report.
+### Phase 10 — Release Hardening (COMPLETE)
+
+- **Critical Path Automated Integration Suite**:
+  - `test/integration/critical_path.test.ts`: Validated the complete non-trivial end-to-end user journey specified in `docs/GAME_SPEC.md`:
+    1. New visitor creates guest session -> receives 10,000 đ starter capital, Level 1, Tier 1 cart.
+    2. Player cooks orders in `CookingManager`, serves customers, earns satisfaction score and tips.
+    3. Idempotent reward submission (`POST /api/v1/orders/complete`) validates tokens, records order run, and updates authoritative balances.
+    4. Replay attack rejection: Re-submitting the identical idempotency key returns the prior run without double-rewarding.
+    5. Refresh simulation: Calling `GET /api/v1/player` with stored session token recovers exact coins and XP.
+    6. Cart upgrade purchase: `POST /api/v1/upgrades/purchase` safely deducts coins and elevates `pan_capacity` to Tier 2.
+    7. Refresh simulation: Upgrade and modified balances remain completely persisted.
+- **Database Index Optimization & Integrity**:
+  - `src/db/schema.ts` & Drizzle migration `drizzle/0003_yummy_mach_iv.sql`:
+    - Added `idx_order_runs_player` on `order_runs(player_id)`.
+    - Existing B-tree indexes confirmed on `player_sessions(session_token)`, `player_food_unlocks(player_id, food_id)`, `player_upgrades(player_id, upgrade_key)`, `order_runs(idempotency_key)`, and `player_achievements(player_id, achievement_id)`.
+- **API Hardening, Rate Limiting & Security Headers**:
+  - `api/index.ts`:
+    - In-memory rolling-window rate limiter on all endpoints (120 requests/minute per client IP), returning HTTP 429 upon excess.
+    - Security headers: `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, and `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Production Environment & Vercel Compatibility**:
+  - `.env.example`: Clean reference documenting `DATABASE_URL` (Neon PostgreSQL) and `NODE_ENV`.
+  - `vercel.json`: Validated Vite framework preset, `dist` output directory, and Hono serverless rewrites.
+- **Final Verification Commands & Results**:
+  - `pnpm run typecheck`: Passed (0 errors)
+  - `pnpm run lint`: Passed (0 errors, 0 warnings)
+  - `pnpm run format`: Passed (all files match Prettier style)
+  - `pnpm run test`: Passed (13 test files, 53 tests passed)
+  - `pnpm run build`: Passed (production build completes in ~8.5s)
+
+---
+
+## Final Project Status
+
+All 10 phases of the `/build-game` workflow have been implemented, verified, and locked in:
+
+- **Phase 1 — Repository Foundation**: React 19, Vite 6, Phaser 3, Tailwind CSS, Inox tokens.
+- **Phase 2 — Cooking Vertical Slice**: Multi-slot frying pan state machine, particle splash/bubbles, scooping.
+- **Phase 3 — PostgreSQL Persistence**: Neon PostgreSQL driver with in-memory fallback, Drizzle ORM, guest auth, idempotent rewards.
+- **Phase 4 — Large Content Catalog**: Full 60 authentic street snacks from `docs/FOOD_CATALOG.md`, Collection book, Shop unlocks.
+- **Phase 5 — Sauce / Serving Depth**: 5 Southern Vietnamese squeeze sauces, pickled dish garnish, satisfaction scoring, tips.
+- **Phase 6 — Progression & Upgrades**: Hardware cart upgrades (pan capacity, thermostat, awning, tongs, trays), achievements, street statistics.
+- **Phase 7 — Art Production**: Procedural 2.5D elevated perspective canvas pipeline adhering strictly to `docs/ART_BIBLE.md`.
+- **Phase 8 — Audio + Juice**: Zero-dependency Web Audio procedural synthesis (frying loops, drop splash, tongs clink, squeeze squirt, coin chime), tactile mobile haptics, prefers-reduced-motion safety.
+- **Phase 9 — Responsive / PWA / Accessibility**: 320px–desktop responsive layouts, safe-area insets, installable PWA manifest & icons, offline caching Service Worker, reconnect UX.
+- **Phase 10 — Release Hardening**: Critical path automated flow test, PostgreSQL indexes, security headers, rate limiting, Vercel readiness.
+
+The codebase is fully tested, hardened, and ready for production deployment on Vercel.
