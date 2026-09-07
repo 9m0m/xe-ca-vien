@@ -109,6 +109,7 @@
 ## Next Phase
 
 ### Phase 6 — Progression & Upgrades (COMPLETE)
+
 - **Cart Upgrades System**:
   - Typed multi-tier catalog in `src/game/data/upgrades.ts`:
     - `pan_capacity`: Chảo Dầu Mở Rộng (6 -> 8 -> 10 vị trí chiên đồng thời).
@@ -150,11 +151,56 @@
 
 ---
 
+### Phase 7 — Art Production (COMPLETE)
+- **Canonical 2.5D Art Pipeline**:
+  - `src/game/art/assetRegistry.ts`: Comprehensive registry defining exact sprite keys, dimensions, canonical elevated three-quarter perspective, categories, and Vietnamese visual descriptions per `docs/ART_BIBLE.md`.
+  - Elevated 3/4 perspective with grounded contact drop shadows for all food items.
+  - Consistent top-left warm key lighting (`0xfffbeb`) and subtle bottom-right bounce.
+  - Dark warm 1.5–2px outlines ensuring crisp silhouette legibility across mobile viewports (320px–430px).
+- **Southern Vietnamese Street-Food Detailing**:
+  - `pan_surface`: Inox rim with metallic sheen, rivets, dual wok loop handles, and shimmering amber oil depth.
+  - `serving_plate`: Polished stainless steel rectangular plate with anti-slip embossed ridges and specular highlights.
+  - `prep_tray`: Multi-compartment stainless steel ingredient tray with depth shadows.
+  - Food items:
+    - Cá viên: Natural golden fry blister textures and soft highlight.
+    - Bò viên: Deep burgundy-brown base with black pepper flecks and seared crust.
+    - Xúc xích đỏ: Characteristic street-cart score cuts (`khía hoa thị`) that open under heat.
+    - Đậu hũ cá: Beveled 2.5D cube with golden fried crust sides and soft ivory top.
+    - Surimi, dumplings, cheese sticks, and snail specialty shapes with authentic street cues.
+  - Squeeze bottles & garnish:
+    - 5 translucent squeeze bottles with conical nozzles and sauce fill lines.
+    - Sài Gòn blue melamine dish with cucumber wheels and crinkle-cut carrot slivers.
+- **Verification Commands & Results**:
+  - `pnpm run typecheck`: Passed (0 errors)
+  - `pnpm run lint`: Passed (0 errors, 0 warnings)
+  - `pnpm run format`: Passed (all files match Prettier style)
+  - `pnpm run test`: Passed (10 test files, 39 tests passed)
+  - `pnpm run build`: Passed (production bundle ready)
+
+---
+
+## Current Architecture Decisions
+
+1. **Frontend**: React 19 + TypeScript + Vite + Phaser 3 + Zustand.
+2. **Backend**: Hono on Vercel Functions (`/api/v1/...`).
+3. **Food & Sauce Simulation**: Deterministic data-driven modeling in `CookingManager` and `catalog.ts` / `sauces.ts`.
+4. **Authority**: Progression, unlocks, upgrades, achievements, and rewards are strictly server-authoritative.
+5. **Database**: PostgreSQL on Neon via Drizzle ORM.
+6. **Art System**: Centralized asset registry adhering strictly to `docs/ART_BIBLE.md` with mobile-first silhouette verification.
+
+---
+
 ## Next Phase
 
-- **Phase 7 — Art Production**:
-  - Replace procedural geometric placeholders with canonical 2.5D / isometric Southern Vietnamese street cart illustration assets.
-  - Canonical food silhouettes tested at small phone resolution (320px – 390px).
-  - High-res sprite sheet / texture atlas pipeline.
-  - Street environment detailing: Inox cart reflection, red plastic stools, chalkboard menu styling.
+- **Phase 8 — Audio + Juice**:
+  - Web Audio synthesis / procedural sound generator:
+    - Continuous simmering/frying oil sound loop
+    - Food drop sizzle & splash sound
+    - Metal tongs scooping clink sound
+    - Squeeze bottle sauce squirt sound
+    - Order completed coin chime / cash sound
+    - Customer greeting & satisfaction fanfare
+  - Audio toggle & volume controls in Zustand and Phaser
+  - Mobile haptics (`navigator.vibrate`) on touch drops and scoops
+  - Accessibility: `prefers-reduced-motion` compliance
 
