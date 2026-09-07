@@ -54,6 +54,31 @@ app.notFound((c) => {
 // V1 API Router
 const v1 = new Hono()
 
+// Root API info endpoint
+app.get('/', (c) => {
+  return c.json({
+    success: true,
+    data: {
+      service: 'xe-ca-vien-api',
+      version: '0.1.0',
+      endpoints: ['/api/v1/health', '/api/v1/game/config', '/api/v1/session/guest'],
+    },
+  })
+})
+
+// Direct health endpoint
+app.get('/health', (c) => {
+  return c.json({
+    success: true,
+    data: {
+      status: 'ok',
+      service: 'xe-ca-vien-api',
+      version: '0.1.0',
+      timestamp: new Date().toISOString(),
+    },
+  })
+})
+
 // Health check endpoint
 v1.get('/health', (c) => {
   return c.json({
@@ -115,25 +140,54 @@ v1.route('/achievements', achievementsRouter)
 
 app.route('/v1', v1)
 
-const nodeListener = getRequestListener(app.fetch)
+const nodeListener = getRequestListener(app.fetch.bind(app))
 
 // Universal handler supporting Node.js Serverless Functions (req, res),
 // Vercel Edge Runtime, and Vite dev server.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-const universalHandler = (req: any, res?: any) => {
-  if (res && typeof res.writeHead === 'function') {
-    const matched =
-      req.headers?.['x-matched-path'] ||
-      req.headers?.['x-invoke-path'] ||
-      req.headers?.['x-forwarded-uri']
-    if (matched && (req.url === '/api' || req.url?.startsWith('/api?'))) {
-      const queryIdx = req.url.indexOf('?')
-      const query = queryIdx >= 0 ? req.url.slice(queryIdx) : ''
-      req.url = matched + query
+const universalHandler = async (req: any, res?: any) => {
+  try {
+    if (res && typeof res.writeHead === 'function') {
+      const matched =
+        req.headers?.['x-matched-path'] ||
+        req.headers?.['x-invoke-path'] ||
+        req.headers?.['x-forwarded-uri']
+      if (matched && (req.url === '/api' || req.url?.startsWith('/api?'))) {
+        const queryIdx = req.url.indexOf('?')
+        const query = queryIdx >= 0 ? req.url.slice(queryIdx) : ''
+        req.url = matched + query
+      }
+      return await nodeListener(req, res)
     }
-    return nodeListener(req, res)
+    return await app.fetch(req)
+  } catch (err: unknown) {
+    const errorObj = err instanceof Error ? err : new Error(String(err))
+    console.error('SERVERLESS HANDLER UNCAUGHT ERROR:', errorObj)
+    if (res && typeof res.writeHead === 'function') {
+      res.writeHead(500, { 'Content-Type': 'application/json' })
+      res.end(
+        JSON.stringify({
+          success: false,
+          error: {
+            code: 'SERVERLESS_INVOCATION_ERROR',
+            message: errorObj.message,
+            stack: errorObj.stack,
+          },
+        }),
+      )
+      return
+    }
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: {
+          code: 'SERVERLESS_INVOCATION_ERROR',
+          message: err?.message || String(err),
+        },
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } },
+    )
   }
-  return app.fetch(req)
 }
 
 universalHandler.fetch = app.fetch.bind(app)
