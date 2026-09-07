@@ -115,4 +115,7 @@ v1.route('/achievements', achievementsRouter)
 
 app.route('/v1', v1)
 
-export default handle(app)
+const handler = handle(app)
+Object.assign(handler, { fetch: app.fetch.bind(app) })
+
+export default process.env.VERCEL ? handler : app

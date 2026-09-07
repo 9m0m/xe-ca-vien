@@ -59,8 +59,6 @@ interface AppState {
   setIsOnline: (online: boolean) => void
 }
 
-const SESSION_STORAGE_KEY = 'xcv_session_token'
-
 export const useAppStore = create<AppState>((set, get) => ({
   playerId: null,
   sessionToken: null,
@@ -98,17 +96,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   initSession: async () => {
     try {
-      const storedToken =
-        typeof window !== 'undefined' ? localStorage.getItem(SESSION_STORAGE_KEY) : null
-
-      const headers: Record<string, string> = {}
-      if (storedToken) {
-        headers['Authorization'] = `Bearer ${storedToken}`
-      }
-
       const res = await fetch('/api/v1/session/guest', {
         method: 'POST',
-        headers,
+        credentials: 'same-origin',
       })
 
       if (!res.ok) throw new Error('Không thể khởi tạo phiên chơi')
@@ -125,9 +115,6 @@ export const useAppStore = create<AppState>((set, get) => ({
           unlockedAchievements,
           claimedAchievements,
         } = json.data
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(SESSION_STORAGE_KEY, sessionToken)
-        }
 
         set({
           playerId: player.id,
@@ -168,9 +155,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch('/api/v1/orders/start', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
         },
         body: JSON.stringify({ preferredItems: items }),
       })
@@ -194,9 +182,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch('/api/v1/shop/unlock', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
         },
         body: JSON.stringify({ foodId }),
       })
@@ -228,9 +217,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch('/api/v1/upgrades/purchase', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
         },
         body: JSON.stringify({ upgradeKey }),
       })
@@ -268,9 +258,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const res = await fetch('/api/v1/achievements/claim', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+          ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
         },
         body: JSON.stringify({ achievementId }),
       })
@@ -300,9 +291,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       try {
         const res = await fetch('/api/v1/orders/complete', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: sessionToken ? `Bearer ${sessionToken}` : '',
+            ...(sessionToken ? { Authorization: `Bearer ${sessionToken}` } : {}),
           },
           body: JSON.stringify({
             orderId: payload.orderId,
@@ -397,3 +389,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setIsOnline: (online) => set({ isOnline: online }),
 }))
+
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __APP_STORE__: typeof useAppStore }).__APP_STORE__ = useAppStore
+}

@@ -1,4 +1,4 @@
-import { eq, and, sql, gte } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { getDb } from './client'
 import {
   players,
@@ -216,6 +216,53 @@ class MemoryStore {
       xpAwarded: number
     }
   > = new Map()
+
+  /**
+   * Runs a state mutation synchronously inside an atomic transaction snapshot.
+   * If any exception is thrown, state is cleanly rolled back to its pre-transaction state.
+   */
+  runInTransaction<T>(action: () => T): T {
+    const playersSnap = new Map(this.players)
+    const sessionsSnap = new Map(this.sessions)
+    const progressSnap = new Map(Array.from(this.progress.entries()).map(([k, v]) => [k, { ...v }]))
+    const unlocksSnap = new Map(Array.from(this.unlocks.entries()).map(([k, v]) => [k, [...v]]))
+    const upgradesSnap = new Map(
+      Array.from(this.upgrades.entries()).map(([k, v]) => [k, new Map(v)]),
+    )
+    const statsSnap = new Map(Array.from(this.stats.entries()).map(([k, v]) => [k, { ...v }]))
+    const achSnap = new Map(
+      Array.from(this.achievements.entries()).map(([k, v]) => [k, v.map((item) => ({ ...item }))]),
+    )
+    const ordersSnap = new Map(this.activeOrders)
+    const runsSnap = new Map(this.orderRuns)
+
+    try {
+      return action()
+    } catch (err) {
+      this.players = playersSnap
+      this.sessions = sessionsSnap
+      this.progress = progressSnap
+      this.unlocks = unlocksSnap
+      this.upgrades = upgradesSnap
+      this.stats = statsSnap
+      this.achievements = achSnap
+      this.activeOrders = ordersSnap
+      this.orderRuns = runsSnap
+      throw err
+    }
+  }
+
+  reset() {
+    this.players.clear()
+    this.sessions.clear()
+    this.progress.clear()
+    this.unlocks.clear()
+    this.upgrades.clear()
+    this.stats.clear()
+    this.achievements.clear()
+    this.activeOrders.clear()
+    this.orderRuns.clear()
+  }
 }
 
 const memStore = new MemoryStore()
@@ -944,7 +991,8 @@ export class PlayerRepository {
   }
 
   /**
-   * Unlocks a new food item from the shop with atomic coin deduction and uniqueness enforcement.
+   * Unlocks a new food item from the shop with atomic database transaction,
+   * row locking, balance check, and rollback on failure.
    */
   static async unlockFood(
     playerId: string,
@@ -954,78 +1002,97 @@ export class PlayerRepository {
     const db = getDb()
 
     if (db) {
-      // 1. Check if already unlocked
-      const existing = await db
-        .select()
-        .from(playerFoodUnlocks)
-        .where(eq(playerFoodUnlocks.playerId, playerId))
+      return await db.transaction(async (tx) => {
+        // 1. Lock progression row for this player
+        const [progress] = await tx
+          .select()
+          .from(playerProgress)
+          .where(eq(playerProgress.playerId, playerId))
+          .for('update')
 
-      const unlockedIds = existing.map((e) => e.foodId)
-      if (unlockedIds.includes(foodId)) {
-        throw new Error('ALREADY_UNLOCKED')
-      }
+        if (!progress) {
+          throw new Error('PLAYER_NOT_FOUND')
+        }
 
-      // 2. Atomic coin deduction via returning
-      const updated = await db
-        .update(playerProgress)
-        .set({
-          coins: sql`${playerProgress.coins} - ${cost}`,
-          updatedAt: new Date(),
-        })
-        .where(and(eq(playerProgress.playerId, playerId), gte(playerProgress.coins, cost)))
-        .returning({ newCoins: playerProgress.coins })
+        // 2. Lock & verify food is unowned
+        const existing = await tx
+          .select()
+          .from(playerFoodUnlocks)
+          .where(
+            and(eq(playerFoodUnlocks.playerId, playerId), eq(playerFoodUnlocks.foodId, foodId)),
+          )
+          .for('update')
 
-      if (updated.length === 0) {
-        throw new Error('INSUFFICIENT_COINS')
-      }
+        if (existing.length > 0) {
+          throw new Error('ALREADY_UNLOCKED')
+        }
 
-      // 3. Insert unlock with unique constraint
-      try {
-        await db.insert(playerFoodUnlocks).values({
+        // 3. Check balance >= cost
+        if (progress.coins < cost) {
+          throw new Error('INSUFFICIENT_COINS')
+        }
+
+        // 4. Deduct coins atomically
+        const newCoins = progress.coins - cost
+        await tx
+          .update(playerProgress)
+          .set({
+            coins: newCoins,
+            updatedAt: new Date(),
+          })
+          .where(eq(playerProgress.playerId, playerId))
+
+        // 5. Insert ownership
+        await tx.insert(playerFoodUnlocks).values({
           id: crypto.randomUUID(),
           playerId,
           foodId,
         })
-      } catch {
-        // Rollback coins if unique constraint hit
-        await db
-          .update(playerProgress)
-          .set({ coins: sql`${playerProgress.coins} + ${cost}` })
-          .where(eq(playerProgress.playerId, playerId))
-        throw new Error('ALREADY_UNLOCKED')
-      }
 
-      return {
-        success: true,
-        newCoins: updated[0].newCoins,
-        unlockedFoods: [...unlockedIds, foodId],
-      }
+        // 6. Fetch all unlocked food IDs within the transaction
+        const allUnlocks = await tx
+          .select()
+          .from(playerFoodUnlocks)
+          .where(eq(playerFoodUnlocks.playerId, playerId))
+
+        return {
+          success: true,
+          newCoins,
+          unlockedFoods: allUnlocks.map((r) => r.foodId),
+        }
+      })
     } else {
-      // In-memory fallback
-      const unlocked = memStore.unlocks.get(playerId) || []
-      if (unlocked.includes(foodId)) {
-        throw new Error('ALREADY_UNLOCKED')
-      }
+      // In-memory fallback with atomic transaction and rollback support
+      return memStore.runInTransaction(() => {
+        const unlocked = memStore.unlocks.get(playerId) || []
+        if (unlocked.includes(foodId)) {
+          throw new Error('ALREADY_UNLOCKED')
+        }
 
-      const prog = memStore.progress.get(playerId)
-      if (!prog || prog.coins < cost) {
-        throw new Error('INSUFFICIENT_COINS')
-      }
+        const prog = memStore.progress.get(playerId)
+        if (!prog) {
+          throw new Error('PLAYER_NOT_FOUND')
+        }
+        if (prog.coins < cost) {
+          throw new Error('INSUFFICIENT_COINS')
+        }
 
-      prog.coins -= cost
-      unlocked.push(foodId)
-      memStore.unlocks.set(playerId, unlocked)
+        prog.coins -= cost
+        unlocked.push(foodId)
+        memStore.unlocks.set(playerId, unlocked)
 
-      return {
-        success: true,
-        newCoins: prog.coins,
-        unlockedFoods: [...unlocked],
-      }
+        return {
+          success: true,
+          newCoins: prog.coins,
+          unlockedFoods: [...unlocked],
+        }
+      })
     }
   }
 
   /**
-   * Purchases a cart upgrade with atomic coin deduction and validation against level and tier limits.
+   * Purchases a cart upgrade with atomic database transaction,
+   * row locking, tier and level validation, and rollback on failure.
    */
   static async purchaseUpgrade(
     playerId: string,
@@ -1041,121 +1108,127 @@ export class PlayerRepository {
     const db = getDb()
 
     if (db) {
-      // 1. Check current tier
-      const existing = await db
-        .select()
-        .from(playerUpgrades)
-        .where(
-          and(eq(playerUpgrades.playerId, playerId), eq(playerUpgrades.upgradeKey, upgradeKey)),
-        )
-        .limit(1)
+      return await db.transaction(async (tx) => {
+        // 1. Lock player progress row
+        const [progress] = await tx
+          .select()
+          .from(playerProgress)
+          .where(eq(playerProgress.playerId, playerId))
+          .for('update')
 
-      const currentTier = existing[0]?.tier ?? DEFAULT_UPGRADES[upgradeKey] ?? 1
-      const nextTierConfig = getNextUpgradeTier(upgradeKey, currentTier)
-      if (!nextTierConfig) {
-        throw new Error('ALREADY_MAX_TIER')
-      }
+        if (!progress) throw new Error('PLAYER_NOT_FOUND')
 
-      // Check level requirement
-      const prog = (
-        await db.select().from(playerProgress).where(eq(playerProgress.playerId, playerId)).limit(1)
-      )[0]
-      if (!prog) throw new Error('PLAYER_NOT_FOUND')
-
-      if (prog.level < nextTierConfig.levelRequired) {
-        throw new Error('LEVEL_TOO_LOW')
-      }
-
-      // 2. Atomic coin deduction
-      const updated = await db
-        .update(playerProgress)
-        .set({
-          coins: sql`${playerProgress.coins} - ${nextTierConfig.cost}`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(playerProgress.playerId, playerId),
-            gte(playerProgress.coins, nextTierConfig.cost),
-          ),
-        )
-        .returning({ newCoins: playerProgress.coins })
-
-      if (updated.length === 0) {
-        throw new Error('INSUFFICIENT_COINS')
-      }
-
-      // 3. Update or insert tier
-      if (existing.length > 0) {
-        await db
-          .update(playerUpgrades)
-          .set({ tier: nextTierConfig.tier, purchasedAt: new Date() })
+        // 2. Lock player upgrade row for this upgradeKey
+        const existing = await tx
+          .select()
+          .from(playerUpgrades)
           .where(
             and(eq(playerUpgrades.playerId, playerId), eq(playerUpgrades.upgradeKey, upgradeKey)),
           )
-      } else {
-        await db.insert(playerUpgrades).values({
-          id: crypto.randomUUID(),
-          playerId,
-          upgradeKey,
-          tier: nextTierConfig.tier,
-        })
-      }
+          .for('update')
 
-      const allUpgrades = await db
-        .select()
-        .from(playerUpgrades)
-        .where(eq(playerUpgrades.playerId, playerId))
+        const currentTier = existing[0]?.tier ?? DEFAULT_UPGRADES[upgradeKey] ?? 1
+        const nextTierConfig = getNextUpgradeTier(upgradeKey, currentTier)
+        if (!nextTierConfig) {
+          throw new Error('ALREADY_MAX_TIER')
+        }
 
-      const upgradesMap: Record<string, number> = { ...DEFAULT_UPGRADES }
-      for (const u of allUpgrades) {
-        upgradesMap[u.upgradeKey] = u.tier
-      }
+        // 3. Verify level requirement
+        if (progress.level < nextTierConfig.levelRequired) {
+          throw new Error('LEVEL_TOO_LOW')
+        }
 
-      return {
-        success: true,
-        newCoins: updated[0].newCoins,
-        upgrades: upgradesMap,
-      }
+        // 4. Check balance >= cost
+        if (progress.coins < nextTierConfig.cost) {
+          throw new Error('INSUFFICIENT_COINS')
+        }
+
+        // 5. Deduct coins
+        const newCoins = progress.coins - nextTierConfig.cost
+        await tx
+          .update(playerProgress)
+          .set({
+            coins: newCoins,
+            updatedAt: new Date(),
+          })
+          .where(eq(playerProgress.playerId, playerId))
+
+        // 6. Update or insert upgrade tier
+        if (existing.length > 0) {
+          await tx
+            .update(playerUpgrades)
+            .set({ tier: nextTierConfig.tier, purchasedAt: new Date() })
+            .where(
+              and(eq(playerUpgrades.playerId, playerId), eq(playerUpgrades.upgradeKey, upgradeKey)),
+            )
+        } else {
+          await tx.insert(playerUpgrades).values({
+            id: crypto.randomUUID(),
+            playerId,
+            upgradeKey,
+            tier: nextTierConfig.tier,
+          })
+        }
+
+        // 7. Get all upgrades within transaction
+        const allUpgrades = await tx
+          .select()
+          .from(playerUpgrades)
+          .where(eq(playerUpgrades.playerId, playerId))
+
+        const upgradesMap: Record<string, number> = { ...DEFAULT_UPGRADES }
+        for (const u of allUpgrades) {
+          upgradesMap[u.upgradeKey] = u.tier
+        }
+
+        return {
+          success: true,
+          newCoins,
+          upgrades: upgradesMap,
+        }
+      })
     } else {
-      // In-memory fallback
-      const upgMap = memStore.upgrades.get(playerId) || new Map()
-      const currentTier = upgMap.get(upgradeKey) ?? DEFAULT_UPGRADES[upgradeKey] ?? 1
-      const nextTierConfig = getNextUpgradeTier(upgradeKey, currentTier)
-      if (!nextTierConfig) {
-        throw new Error('ALREADY_MAX_TIER')
-      }
+      // In-memory fallback with atomic transaction and rollback support
+      return memStore.runInTransaction(() => {
+        const upgMap = memStore.upgrades.get(playerId) || new Map()
+        const currentTier = upgMap.get(upgradeKey) ?? DEFAULT_UPGRADES[upgradeKey] ?? 1
+        const nextTierConfig = getNextUpgradeTier(upgradeKey, currentTier)
+        if (!nextTierConfig) {
+          throw new Error('ALREADY_MAX_TIER')
+        }
 
-      const prog = memStore.progress.get(playerId)
-      if (!prog) throw new Error('PLAYER_NOT_FOUND')
+        const prog = memStore.progress.get(playerId)
+        if (!prog) throw new Error('PLAYER_NOT_FOUND')
 
-      if (prog.level < nextTierConfig.levelRequired) {
-        throw new Error('LEVEL_TOO_LOW')
-      }
+        if (prog.level < nextTierConfig.levelRequired) {
+          throw new Error('LEVEL_TOO_LOW')
+        }
 
-      if (prog.coins < nextTierConfig.cost) {
-        throw new Error('INSUFFICIENT_COINS')
-      }
+        if (prog.coins < nextTierConfig.cost) {
+          throw new Error('INSUFFICIENT_COINS')
+        }
 
-      prog.coins -= nextTierConfig.cost
-      upgMap.set(upgradeKey, nextTierConfig.tier)
-      memStore.upgrades.set(playerId, upgMap)
+        prog.coins -= nextTierConfig.cost
+        upgMap.set(upgradeKey, nextTierConfig.tier)
+        memStore.upgrades.set(playerId, upgMap)
 
-      const upgradesMap: Record<string, number> = { ...DEFAULT_UPGRADES }
-      for (const [k, v] of upgMap.entries()) {
-        upgradesMap[k] = v
-      }
+        const upgradesMap: Record<string, number> = { ...DEFAULT_UPGRADES }
+        for (const [k, v] of upgMap.entries()) {
+          upgradesMap[k] = v
+        }
 
-      return {
-        success: true,
-        newCoins: prog.coins,
-        upgrades: upgradesMap,
-      }
+        return {
+          success: true,
+          newCoins: prog.coins,
+          upgrades: upgradesMap,
+        }
+      })
     }
   }
 
   /**
-   * Claims an achievement reward with atomic claim verification.
+   * Claims an achievement reward with atomic database transaction,
+   * row locking, reward crediting, and rollback on failure.
    */
   static async claimAchievement(
     playerId: string,
@@ -1173,21 +1246,9 @@ export class PlayerRepository {
     const db = getDb()
 
     if (db) {
-      // Atomic claim using returning
-      const updated = await db
-        .update(playerAchievements)
-        .set({ claimed: true })
-        .where(
-          and(
-            eq(playerAchievements.playerId, playerId),
-            eq(playerAchievements.achievementId, achievementId),
-            eq(playerAchievements.claimed, false),
-          ),
-        )
-        .returning({ id: playerAchievements.id })
-
-      if (updated.length === 0) {
-        const existing = await db
+      return await db.transaction(async (tx) => {
+        // 1. Lock achievement row and verify unlocked & unclaimed
+        const existing = await tx
           .select()
           .from(playerAchievements)
           .where(
@@ -1196,70 +1257,98 @@ export class PlayerRepository {
               eq(playerAchievements.achievementId, achievementId),
             ),
           )
-          .limit(1)
+          .for('update')
 
-        if (existing.length === 0) throw new Error('ACHIEVEMENT_NOT_UNLOCKED')
-        throw new Error('ACHIEVEMENT_ALREADY_CLAIMED')
-      }
+        if (existing.length === 0) {
+          throw new Error('ACHIEVEMENT_NOT_UNLOCKED')
+        }
 
-      // Award coins and XP
-      const progRes = await db
-        .update(playerProgress)
-        .set({
-          coins: sql`${playerProgress.coins} + ${ach.rewardCoins}`,
-          xp: sql`${playerProgress.xp} + ${ach.rewardXp}`,
-          level: sql`1 + floor((${playerProgress.xp} + ${ach.rewardXp}) / 100)`,
-          updatedAt: new Date(),
-        })
-        .where(eq(playerProgress.playerId, playerId))
-        .returning({
-          coins: playerProgress.coins,
-          xp: playerProgress.xp,
-          level: playerProgress.level,
-        })
+        if (existing[0].claimed) {
+          throw new Error('ACHIEVEMENT_ALREADY_CLAIMED')
+        }
 
-      const allClaimed = await db
-        .select()
-        .from(playerAchievements)
-        .where(and(eq(playerAchievements.playerId, playerId), eq(playerAchievements.claimed, true)))
+        // 2. Mark claimed = true
+        await tx
+          .update(playerAchievements)
+          .set({ claimed: true })
+          .where(eq(playerAchievements.id, existing[0].id))
 
-      return {
-        success: true,
-        newCoins: progRes[0].coins,
-        newXp: progRes[0].xp,
-        newLevel: progRes[0].level,
-        claimedAchievements: allClaimed.map((a) => a.achievementId),
-      }
+        // 3. Lock progression row
+        const [progress] = await tx
+          .select()
+          .from(playerProgress)
+          .where(eq(playerProgress.playerId, playerId))
+          .for('update')
+
+        if (!progress) throw new Error('PLAYER_NOT_FOUND')
+
+        // 4. Calculate rewards and new level
+        const newCoins = progress.coins + ach.rewardCoins
+        const newXp = progress.xp + ach.rewardXp
+        const newLevel = 1 + Math.floor(newXp / 100)
+
+        await tx
+          .update(playerProgress)
+          .set({
+            coins: newCoins,
+            xp: newXp,
+            level: newLevel,
+            updatedAt: new Date(),
+          })
+          .where(eq(playerProgress.playerId, playerId))
+
+        // 5. Get all claimed achievements
+        const allClaimed = await tx
+          .select()
+          .from(playerAchievements)
+          .where(
+            and(eq(playerAchievements.playerId, playerId), eq(playerAchievements.claimed, true)),
+          )
+
+        return {
+          success: true,
+          newCoins,
+          newXp,
+          newLevel,
+          claimedAchievements: allClaimed.map((a) => a.achievementId),
+        }
+      })
     } else {
-      // In-memory fallback
-      const achList = memStore.achievements.get(playerId) || []
-      const target = achList.find((a) => a.id === achievementId)
-      if (!target) throw new Error('ACHIEVEMENT_NOT_UNLOCKED')
-      if (target.claimed) throw new Error('ACHIEVEMENT_ALREADY_CLAIMED')
+      // In-memory fallback with atomic transaction and rollback support
+      return memStore.runInTransaction(() => {
+        const achList = memStore.achievements.get(playerId) || []
+        const target = achList.find((a) => a.id === achievementId)
+        if (!target) throw new Error('ACHIEVEMENT_NOT_UNLOCKED')
+        if (target.claimed) throw new Error('ACHIEVEMENT_ALREADY_CLAIMED')
 
-      target.claimed = true
+        target.claimed = true
 
-      const prog = memStore.progress.get(playerId) || {
-        id: 'mock',
-        playerId,
-        coins: 0,
-        xp: 0,
-        level: 1,
-        reputation: 100,
-      }
-      prog.coins += ach.rewardCoins
-      prog.xp += ach.rewardXp
-      prog.level = 1 + Math.floor(prog.xp / 100)
-      memStore.progress.set(playerId, prog)
+        const prog = memStore.progress.get(playerId) || {
+          id: 'mock',
+          playerId,
+          coins: 0,
+          xp: 0,
+          level: 1,
+          reputation: 100,
+        }
+        prog.coins += ach.rewardCoins
+        prog.xp += ach.rewardXp
+        prog.level = 1 + Math.floor(prog.xp / 100)
+        memStore.progress.set(playerId, prog)
 
-      const claimed = achList.filter((a) => a.claimed).map((a) => a.id)
-      return {
-        success: true,
-        newCoins: prog.coins,
-        newXp: prog.xp,
-        newLevel: prog.level,
-        claimedAchievements: claimed,
-      }
+        const claimed = achList.filter((a) => a.claimed).map((a) => a.id)
+        return {
+          success: true,
+          newCoins: prog.coins,
+          newXp: prog.xp,
+          newLevel: prog.level,
+          claimedAchievements: claimed,
+        }
+      })
     }
+  }
+
+  static getMemStore(): MemoryStore {
+    return memStore
   }
 }

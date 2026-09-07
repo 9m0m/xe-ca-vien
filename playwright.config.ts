@@ -42,9 +42,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm preview --port 4173 --host 127.0.0.1',
+    command: 'pnpm dev --port 4173 --host 127.0.0.1',
     port: 4173,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
+    env: {
+      ALLOW_IN_MEMORY_DB: 'true',
+    },
   },
 })

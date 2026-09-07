@@ -237,4 +237,24 @@ describe('Security, Authority & Adversarial API Tests', () => {
       if (originalAllowMem !== undefined) process.env.ALLOW_IN_MEMORY_DB = originalAllowMem
     }
   })
+
+  it('8. Production mock guard: ALLOW_IN_MEMORY_DB=true NEVER enables in-memory fallback in production', () => {
+    const originalEnv = process.env.NODE_ENV
+    const originalDbUrl = process.env.DATABASE_URL
+    const originalAllowMem = process.env.ALLOW_IN_MEMORY_DB
+
+    try {
+      process.env.NODE_ENV = 'production'
+      process.env.ALLOW_IN_MEMORY_DB = 'true'
+      delete process.env.DATABASE_URL
+
+      expect(() => getDb()).toThrowError(
+        /DATABASE_URL environment variable is required in production mode/,
+      )
+    } finally {
+      process.env.NODE_ENV = originalEnv
+      if (originalDbUrl !== undefined) process.env.DATABASE_URL = originalDbUrl
+      if (originalAllowMem !== undefined) process.env.ALLOW_IN_MEMORY_DB = originalAllowMem
+    }
+  })
 })
