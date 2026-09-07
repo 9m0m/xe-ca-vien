@@ -86,21 +86,25 @@ describe('CookingManager', () => {
   it('should evaluate order successfully when required foods are prepared on plate', () => {
     const order = manager.getCurrentOrder()!
     const firstItem = order.items[0]
+    const config1 = getFoodConfig(firstItem.foodId)!
+    const perfectTime1 = config1.cookTimeMs + config1.perfectWindowMs / 2
 
     // Prepare required items and scoop to plate
     for (let i = 0; i < firstItem.quantity; i++) {
       const slot = manager.addFoodToPan(firstItem.foodId)!
       // Advance to perfect cooking time
-      manager.update(5000)
+      manager.update(perfectTime1)
       manager.removeFoodFromPan(slot)
     }
 
     // If order had 2 types of items, prepare second as well
     if (order.items.length > 1) {
       const secondItem = order.items[1]
+      const config2 = getFoodConfig(secondItem.foodId)!
+      const perfectTime2 = config2.cookTimeMs + config2.perfectWindowMs / 2
       for (let i = 0; i < secondItem.quantity; i++) {
         const slot = manager.addFoodToPan(secondItem.foodId)!
-        manager.update(5000)
+        manager.update(perfectTime2)
         manager.removeFoodFromPan(slot)
       }
     }

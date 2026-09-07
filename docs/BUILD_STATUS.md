@@ -152,6 +152,7 @@
 ---
 
 ### Phase 7 — Art Production (COMPLETE)
+
 - **Canonical 2.5D Art Pipeline**:
   - `src/game/art/assetRegistry.ts`: Comprehensive registry defining exact sprite keys, dimensions, canonical elevated three-quarter perspective, categories, and Vietnamese visual descriptions per `docs/ART_BIBLE.md`.
   - Elevated 3/4 perspective with grounded contact drop shadows for all food items.
@@ -190,17 +191,50 @@
 
 ---
 
+---
+
+### Phase 8 — Audio + Juice (COMPLETE)
+
+- **Zero-Dependency Web Audio Synthesis**:
+  - `src/game/audio/soundManager.ts`: Procedural audio synthesis engine generating authentic Vietnamese street-food sound effects without external audio assets:
+    - `startFryingLoop()` / `stopFryingLoop()`: Filtered pink noise with sporadic crackle bursts simulating boiling cooking oil in the wok, dynamically toggled based on active pan items.
+    - `playDropSplash()`: Sizzling downward pitch burst when dropping food into boiling oil.
+    - `playScoop()`: Resonant stainless steel tongs clink sound upon scooping items to the plate.
+    - `playSauceSquirt()`: Crisp tactile squirt chirp when squeezing condiment bottles.
+    - `playCashChime()`: Two-tone bright coin bell chime (C6 -> E6) on order completion.
+    - `playError()`: Low dull thud tone on incorrect orders or complaints.
+  - Store-connected volume and mute control with lazy browser audio context resumption on user interaction.
+- **Mobile Haptic Feedback System**:
+  - `src/game/systems/haptics.ts`: `triggerHaptic('light' | 'medium' | 'success' | 'warning')` via `navigator.vibrate` with graceful fallbacks for desktop and unsupported environments.
+  - Light vibration (12ms) on dropping food & squirting sauces; medium pulse (20ms) on metal tongs scooping; rhythmic success burst `[20, 40, 30]` on serving completed orders; warning buzz `[40, 50, 40]` on order defect.
+- **Accessibility & Reduced Motion**:
+  - `src/game/systems/accessibility.ts`: `isReducedMotionPreferred()` and `getAnimationDuration(baseMs)` honoring `prefers-reduced-motion: reduce`.
+  - Phaser tweens and scooping flights adjust duration to 0ms when reduced motion is requested.
+- **Verification Commands & Results**:
+  - `pnpm run typecheck`: Passed (0 errors)
+  - `pnpm run lint`: Passed (0 errors, 0 warnings)
+  - `pnpm run format`: Passed (all files match Prettier style)
+  - `pnpm run test`: Passed (11 test files, 45 tests passed)
+  - `pnpm run build`: Passed (production bundle ready)
+
+---
+
+## Current Architecture Decisions
+
+1. **Frontend**: React 19 + TypeScript + Vite + Phaser 3 + Zustand.
+2. **Backend**: Hono on Vercel Functions (`/api/v1/...`).
+3. **Food & Sauce Simulation**: Deterministic data-driven modeling in `CookingManager` and `catalog.ts` / `sauces.ts`.
+4. **Authority**: Progression, unlocks, upgrades, achievements, and rewards are strictly server-authoritative.
+5. **Database**: PostgreSQL on Neon via Drizzle ORM.
+6. **Art System**: Centralized asset registry adhering strictly to `docs/ART_BIBLE.md` with mobile-first silhouette verification.
+7. **Audio & Juice**: Zero-asset procedural Web Audio synthesis with tactile mobile haptics and prefers-reduced-motion safety.
+
+---
+
 ## Next Phase
 
-- **Phase 8 — Audio + Juice**:
-  - Web Audio synthesis / procedural sound generator:
-    - Continuous simmering/frying oil sound loop
-    - Food drop sizzle & splash sound
-    - Metal tongs scooping clink sound
-    - Squeeze bottle sauce squirt sound
-    - Order completed coin chime / cash sound
-    - Customer greeting & satisfaction fanfare
-  - Audio toggle & volume controls in Zustand and Phaser
-  - Mobile haptics (`navigator.vibrate`) on touch drops and scoops
-  - Accessibility: `prefers-reduced-motion` compliance
-
+- **Phase 9 — Responsive / PWA / Accessibility**:
+  - Cross-device responsive viewport handling (320px ultra-compact, 390px canonical phone, tablet, and desktop wideview).
+  - Mobile safe-area padding handling (`env(safe-area-inset-top)` / `env(safe-area-inset-bottom)`).
+  - Progressive Web App manifest (`manifest.webmanifest`), street-cart app icons, and offline caching shell.
+  - Offline / reconnect resilience indicators in UI.

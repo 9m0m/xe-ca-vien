@@ -4,6 +4,9 @@ import { CookingState, FryingItem } from '../types'
 import { getFoodConfig } from '../data/catalog'
 import { getSauceConfig } from '../data/sauces'
 import { useAppStore } from '@/store/useAppStore'
+import { soundManager } from '../audio/soundManager'
+import { triggerHaptic } from '../systems/haptics'
+import { isReducedMotionPreferred, getAnimationDuration } from '../systems/accessibility'
 
 interface SlotDisplay {
   container: Phaser.GameObjects.Container
@@ -168,6 +171,23 @@ export class KitchenScene extends Phaser.Scene {
 
     // Initial render of order
     this.refreshOrderDisplay()
+
+    // Store subscription for live upgrade & audio updates
+    this.unsubscribeStore = useAppStore.subscribe((state, prevState) => {
+      if (state.upgrades !== prevState.upgrades) {
+        this.applyUpgradesFromStore()
+      }
+      if (
+        state.soundEnabled !== prevState.soundEnabled ||
+        state.soundVolume !== prevState.soundVolume
+      ) {
+        if (!state.soundEnabled) {
+          soundManager.stopFryingLoop()
+        } else {
+          soundManager.updateFryingVolume()
+        }
+      }
+    })
   }
 
   private setupOrderDisplay(width: number) {
@@ -372,13 +392,16 @@ export class KitchenScene extends Phaser.Scene {
         .setOrigin(0.5)
 
       bottle.on('pointerdown', () => {
+        soundManager.playSauceSquirt()
+        triggerHaptic('light')
+
         // Squeeze bounce
         this.tweens.add({
           targets: bottle,
           scaleY: 0.8,
           scaleX: 1.15,
           yoyo: true,
-          duration: 90,
+          duration: getAnimationDuration(90),
           ease: 'Quad.easeInOut',
         })
 
@@ -477,6 +500,9 @@ export class KitchenScene extends Phaser.Scene {
         this.applyUpgradesFromStore()
         this.refreshFoodPrepTray()
       }
+      if (state.soundVolume !== prev.soundVolume || state.soundEnabled !== prev.soundEnabled) {
+        soundManager.updateFryingVolume()
+      }
     })
   }
 
@@ -536,6 +562,9 @@ export class KitchenScene extends Phaser.Scene {
     const targetX = this.scale.width / 2 + offset.x
     const targetY = 240 + offset.y
 
+    soundManager.playDropSplash()
+    triggerHaptic('light')
+
     // Flying drop animation into pan
     const flyingSprite = this.add.image(fromX, fromY, getFoodConfig(foodId)?.spriteKey ?? foodId)
     this.tweens.add({
@@ -544,20 +573,22 @@ export class KitchenScene extends Phaser.Scene {
       y: targetY,
       scaleX: 0.9,
       scaleY: 0.9,
-      duration: 250,
+      duration: getAnimationDuration(250),
       ease: 'Back.easeOut',
       onComplete: () => {
         flyingSprite.destroy()
 
         // Splash particle effect on drop into hot oil
-        const splash = this.add.particles(targetX, targetY, 'oil_splash', {
-          speed: { min: 40, max: 90 },
-          angle: { min: 0, max: 360 },
-          scale: { start: 0.8, end: 0 },
-          lifespan: 300,
-          quantity: 6,
-        })
-        this.time.delayedCall(300, () => splash.destroy())
+        if (!isReducedMotionPreferred()) {
+          const splash = this.add.particles(targetX, targetY, 'oil_splash', {
+            speed: { min: 40, max: 90 },
+            angle: { min: 0, max: 360 },
+            scale: { start: 0.8, end: 0 },
+            lifespan: 300,
+            quantity: 6,
+          })
+          this.time.delayedCall(300, () => splash.destroy())
+        }
       },
     })
   }
@@ -565,6 +596,9 @@ export class KitchenScene extends Phaser.Scene {
   private handleScoopFood(slotIndex: number) {
     const plateItem = this.cookingManager.removeFoodFromPan(slotIndex)
     if (!plateItem) return
+
+    soundManager.playScoop()
+    triggerHaptic('medium')
 
     const offsets = this.getSlotOffsets(this.panSlots)
     const offset = offsets[slotIndex] || { x: 0, y: 0 }
@@ -579,7 +613,7 @@ export class KitchenScene extends Phaser.Scene {
       targets: flyingSprite,
       x: this.scale.width / 2,
       y: 445,
-      duration: Math.round(220 / this.speedTongsFactor),
+      duration: getAnimationDuration(Math.round(220 / this.speedTongsFactor)),
       ease: 'Quad.easeInOut',
       onComplete: () => {
         flyingSprite.destroy()
@@ -647,9 +681,14 @@ export class KitchenScene extends Phaser.Scene {
     const evalResult = this.cookingManager.serveCurrentOrder()
 
     if (!evalResult.success) {
+      soundManager.playError()
+      triggerHaptic('warning')
       this.showToast(`❌ ${evalResult.feedback}`)
       return
     }
+
+    soundManager.playCashChime()
+    triggerHaptic('success')
 
     // Submit reward to server-authoritative backend
     const { submitOrderReward } = useAppStore.getState()
@@ -703,6 +742,12 @@ export class KitchenScene extends Phaser.Scene {
     this.cookingManager.update(delta)
 
     const slots = this.cookingManager.getSlots()
+    const hasCookingItems = slots.some((s) => s !== null)
+    if (hasCookingItems) {
+      soundManager.startFryingLoop()
+    } else {
+      soundManager.stopFryingLoop()
+    }
 
     for (let i = 0; i < this.slotDisplays.length; i++) {
       const item: FryingItem | null = slots[i]
@@ -761,5 +806,6 @@ export class KitchenScene extends Phaser.Scene {
   destroy() {
     this.unsubscribeStore?.()
     this.bubbleEmitter?.destroy()
+    soundManager.stopFryingLoop()
   }
 }
