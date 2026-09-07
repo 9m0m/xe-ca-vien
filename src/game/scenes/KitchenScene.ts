@@ -23,16 +23,75 @@ export class KitchenScene extends Phaser.Scene {
   private plateContainer?: Phaser.GameObjects.Container
   private orderContainer?: Phaser.GameObjects.Container
   private feedbackText?: Phaser.GameObjects.Text
+  private panHeaderLabel?: Phaser.GameObjects.Text
+  private panSlots = 6
+  private speedTongsFactor = 1.0
+  private itemsPerPage = 4
+  private currentTrayPage = 0
+  private unsubscribeStore?: () => void
 
-  // Coordinates for 6 pan slots (2 rows of 3)
-  private readonly slotOffsets = [
-    { x: -90, y: -45 },
-    { x: 0, y: -45 },
-    { x: 90, y: -45 },
-    { x: -90, y: 45 },
-    { x: 0, y: 45 },
-    { x: 90, y: 45 },
-  ]
+  private getSlotOffsets(count: number): { x: number; y: number }[] {
+    if (count === 8) {
+      return [
+        { x: -105, y: -45 },
+        { x: -35, y: -45 },
+        { x: 35, y: -45 },
+        { x: 105, y: -45 },
+        { x: -105, y: 45 },
+        { x: -35, y: 45 },
+        { x: 35, y: 45 },
+        { x: 105, y: 45 },
+      ]
+    }
+    if (count === 10) {
+      return [
+        { x: -120, y: -45 },
+        { x: -60, y: -45 },
+        { x: 0, y: -45 },
+        { x: 60, y: -45 },
+        { x: 120, y: -45 },
+        { x: -120, y: 45 },
+        { x: -60, y: 45 },
+        { x: 0, y: 45 },
+        { x: 60, y: 45 },
+        { x: 120, y: 45 },
+      ]
+    }
+    return [
+      { x: -90, y: -45 },
+      { x: 0, y: -45 },
+      { x: 90, y: -45 },
+      { x: -90, y: 45 },
+      { x: 0, y: 45 },
+      { x: 90, y: 45 },
+    ]
+  }
+
+  private applyUpgradesFromStore() {
+    const { upgrades } = useAppStore.getState()
+    const panTier = upgrades?.pan_capacity ?? 1
+    const oilTier = upgrades?.oil_thermostat ?? 1
+    const awningTier = upgrades?.awning_comfort ?? 1
+    const tongsTier = upgrades?.speed_tongs ?? 1
+    const trayTier = upgrades?.tray_expansion ?? 1
+
+    const newSlots = panTier === 3 ? 10 : panTier === 2 ? 8 : 6
+    const perfectBonus = oilTier === 3 ? 2000 : oilTier === 2 ? 1000 : 0
+    const patienceBonus = awningTier === 3 ? 30000 : awningTier === 2 ? 15000 : 0
+    this.speedTongsFactor = tongsTier === 3 ? 2.0 : tongsTier === 2 ? 1.5 : 1.0
+    this.itemsPerPage = trayTier >= 2 ? 6 : 4
+
+    this.cookingManager.setUpgradeModifiers({
+      maxPanSlots: newSlots,
+      perfectWindowBonusMs: perfectBonus,
+      customerPatienceBonusMs: patienceBonus,
+    })
+
+    if (newSlots !== this.panSlots) {
+      this.panSlots = newSlots
+      this.rebuildPanSlots()
+    }
+  }
 
   constructor() {
     super('KitchenScene')
@@ -65,8 +124,8 @@ export class KitchenScene extends Phaser.Scene {
     })
 
     // Pan Header label
-    this.add
-      .text(width / 2, panY - 110, 'CHẢO DẦU SÔI (6 NGĂN)', {
+    this.panHeaderLabel = this.add
+      .text(width / 2, panY - 110, `CHẢO DẦU SÔI (${this.panSlots} NGĂN)`, {
         fontFamily: 'system-ui, sans-serif',
         fontSize: '11px',
         fontStyle: 'bold',
@@ -74,7 +133,10 @@ export class KitchenScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
 
-    // 4. Setup 6 Pan Slot Displays
+    // Apply upgrade modifiers before building slots
+    this.applyUpgradesFromStore()
+
+    // 4. Setup Pan Slot Displays
     this.setupPanSlots(width / 2, panY)
 
     // 5. Setup Sauce Bar (Between Pan and Plate)
@@ -214,9 +276,10 @@ export class KitchenScene extends Phaser.Scene {
 
   private setupPanSlots(centerX: number, centerY: number) {
     this.slotDisplays = []
+    const offsets = this.getSlotOffsets(this.panSlots)
 
-    for (let i = 0; i < 6; i++) {
-      const offset = this.slotOffsets[i]
+    for (let i = 0; i < this.panSlots; i++) {
+      const offset = offsets[i] || { x: 0, y: 0 }
       const slotX = centerX + offset.x
       const slotY = centerY + offset.y
 
@@ -225,7 +288,7 @@ export class KitchenScene extends Phaser.Scene {
       // Slot circular wire basket base
       const basketGfx = this.add.graphics()
       basketGfx.lineStyle(1.5, 0x78350f, 0.6)
-      basketGfx.strokeCircle(0, 0, 30)
+      basketGfx.strokeCircle(0, 0, this.panSlots > 6 ? 24 : 30)
       container.add(basketGfx)
 
       // Progress arc graphics
@@ -234,6 +297,7 @@ export class KitchenScene extends Phaser.Scene {
 
       // Food item sprite placeholder (initially invisible)
       const sprite = this.add.image(0, 0, 'fish_ball_classic').setVisible(false)
+      if (this.panSlots > 6) sprite.setScale(0.85)
       sprite.setInteractive({ cursor: 'pointer' })
       const slotIndex = i
       sprite.on('pointerdown', () => this.handleScoopFood(slotIndex))
@@ -241,9 +305,9 @@ export class KitchenScene extends Phaser.Scene {
 
       // Cooking state label badge
       const stateText = this.add
-        .text(0, 26, '', {
+        .text(0, this.panSlots > 6 ? 22 : 26, '', {
           fontFamily: 'system-ui, sans-serif',
-          fontSize: '9px',
+          fontSize: this.panSlots > 6 ? '8px' : '9px',
           fontStyle: 'bold',
           color: '#ffffff',
           stroke: '#000000',
@@ -258,6 +322,17 @@ export class KitchenScene extends Phaser.Scene {
         progressGfx,
         stateText,
       })
+    }
+  }
+
+  private rebuildPanSlots() {
+    for (const display of this.slotDisplays) {
+      display.container.destroy()
+    }
+    this.slotDisplays = []
+    this.setupPanSlots(this.scale.width / 2, 240)
+    if (this.panHeaderLabel) {
+      this.panHeaderLabel.setText(`CHẢO DẦU SÔI (${this.panSlots} NGĂN)`)
     }
   }
 
@@ -337,8 +412,6 @@ export class KitchenScene extends Phaser.Scene {
   }
 
   private trayItemsContainer?: Phaser.GameObjects.Container
-  private currentTrayPage = 0
-  private unsubscribeStore?: () => void
 
   private setupFoodPrepTray(centerX: number, trayY: number) {
     this.add.image(centerX, trayY, 'prep_tray').setOrigin(0.5)
@@ -383,7 +456,7 @@ export class KitchenScene extends Phaser.Scene {
     nextBtn.on('pointerdown', () => {
       const { unlockedFoods } = useAppStore.getState()
       const totalFoods = unlockedFoods.length > 0 ? unlockedFoods.length : 4
-      const maxPages = Math.ceil(totalFoods / 4)
+      const maxPages = Math.ceil(totalFoods / this.itemsPerPage)
       if (this.currentTrayPage < maxPages - 1) {
         this.currentTrayPage++
         this.refreshFoodPrepTray()
@@ -393,12 +466,16 @@ export class KitchenScene extends Phaser.Scene {
     // Render initial tray
     this.refreshFoodPrepTray()
 
-    // Subscribe to store updates when new foods are purchased
+    // Subscribe to store updates when new foods or upgrades are purchased
     this.unsubscribeStore = useAppStore.subscribe((state, prev) => {
       if (state.unlockedFoods.length !== prev.unlockedFoods.length) {
         this.refreshFoodPrepTray()
         this.cookingManager.generateCustomerOrder(state.unlockedFoods)
         this.refreshOrderDisplay()
+      }
+      if (state.upgrades !== prev.upgrades) {
+        this.applyUpgradesFromStore()
+        this.refreshFoodPrepTray()
       }
     })
   }
@@ -413,12 +490,12 @@ export class KitchenScene extends Phaser.Scene {
         ? unlockedFoods
         : ['fish_ball_classic', 'beef_ball_classic', 'sausage_red', 'fish_tofu']
 
-    const itemsPerPage = 4
+    const itemsPerPage = this.itemsPerPage
     const pageStart = this.currentTrayPage * itemsPerPage
     const pageItems = activeFoodIds.slice(pageStart, pageStart + itemsPerPage)
 
-    const slotStartX = -130
-    const slotSpacing = 86
+    const slotStartX = itemsPerPage === 6 ? -150 : -130
+    const slotSpacing = itemsPerPage === 6 ? 60 : 86
 
     pageItems.forEach((foodId, index) => {
       const food = getFoodConfig(foodId)
@@ -427,11 +504,12 @@ export class KitchenScene extends Phaser.Scene {
       const itemX = slotStartX + index * slotSpacing
 
       const sprite = this.add.image(itemX, 0, food.spriteKey).setInteractive({ cursor: 'pointer' })
+      if (itemsPerPage === 6) sprite.setScale(0.85)
 
       const label = this.add
         .text(itemX, 32, food.displayNameVi, {
           fontFamily: 'system-ui, sans-serif',
-          fontSize: '10px',
+          fontSize: itemsPerPage === 6 ? '9px' : '10px',
           fontStyle: 'bold',
           color: '#f8fafc',
         })
@@ -453,9 +531,10 @@ export class KitchenScene extends Phaser.Scene {
       return
     }
 
-    const offset = this.slotOffsets[slotIndex]
+    const offsets = this.getSlotOffsets(this.panSlots)
+    const offset = offsets[slotIndex] || { x: 0, y: 0 }
     const targetX = this.scale.width / 2 + offset.x
-    const targetY = 270 + offset.y
+    const targetY = 240 + offset.y
 
     // Flying drop animation into pan
     const flyingSprite = this.add.image(fromX, fromY, getFoodConfig(foodId)?.spriteKey ?? foodId)
@@ -487,11 +566,12 @@ export class KitchenScene extends Phaser.Scene {
     const plateItem = this.cookingManager.removeFoodFromPan(slotIndex)
     if (!plateItem) return
 
-    const offset = this.slotOffsets[slotIndex]
+    const offsets = this.getSlotOffsets(this.panSlots)
+    const offset = offsets[slotIndex] || { x: 0, y: 0 }
     const fromX = this.scale.width / 2 + offset.x
-    const fromY = 270 + offset.y
+    const fromY = 240 + offset.y
 
-    // Flying scoop animation towards serving plate
+    // Flying scoop animation towards serving plate (duration scaled by speed tongs)
     const config = getFoodConfig(plateItem.foodId)
     const flyingSprite = this.add.image(fromX, fromY, config?.spriteKey ?? plateItem.foodId)
 
@@ -499,7 +579,7 @@ export class KitchenScene extends Phaser.Scene {
       targets: flyingSprite,
       x: this.scale.width / 2,
       y: 445,
-      duration: 220,
+      duration: Math.round(220 / this.speedTongsFactor),
       ease: 'Quad.easeInOut',
       onComplete: () => {
         flyingSprite.destroy()
@@ -624,9 +704,10 @@ export class KitchenScene extends Phaser.Scene {
 
     const slots = this.cookingManager.getSlots()
 
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < this.slotDisplays.length; i++) {
       const item: FryingItem | null = slots[i]
       const display = this.slotDisplays[i]
+      if (!display) continue
 
       if (!item) {
         display.sprite.setVisible(false)

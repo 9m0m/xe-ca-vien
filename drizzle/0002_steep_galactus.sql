@@ -1,0 +1,1 @@
+ALTER TABLE "player_achievements" ADD COLUMN "claimed" boolean DEFAULT false NOT NULL;

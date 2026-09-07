@@ -1,8 +1,21 @@
 import React from 'react'
-import { Coins, Volume2, VolumeX, Settings, X, Flame, BookOpen, Store } from 'lucide-react'
+import {
+  Coins,
+  Volume2,
+  VolumeX,
+  Settings,
+  X,
+  Flame,
+  BookOpen,
+  Store,
+  Wrench,
+  Trophy,
+} from 'lucide-react'
 import { useAppStore } from '@/store/useAppStore'
 import { CollectionModal } from '../modals/CollectionModal'
 import { ShopModal } from '../modals/ShopModal'
+import { UpgradesModal } from '../modals/UpgradesModal'
+import { AchievementsModal } from '../modals/AchievementsModal'
 
 interface GameShellProps {
   children: React.ReactNode
@@ -72,6 +85,26 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
               className="btn-inox h-8 w-8 !p-0"
             >
               <Store className="h-4 w-4 text-slate-700" />
+            </button>
+
+            {/* Upgrades Trigger */}
+            <button
+              onClick={() => setActiveModal('upgrades')}
+              aria-label="Nâng cấp xe cá viên"
+              title="Nâng Cấp Xe"
+              className="btn-inox h-8 w-8 !p-0"
+            >
+              <Wrench className="h-4 w-4 text-slate-700" />
+            </button>
+
+            {/* Achievements Trigger */}
+            <button
+              onClick={() => setActiveModal('achievements')}
+              aria-label="Thành tựu và kỷ lục"
+              title="Thành Tựu"
+              className="btn-inox h-8 w-8 !p-0"
+            >
+              <Trophy className="h-4 w-4 text-slate-700" />
             </button>
 
             {/* Audio Toggle (Quick Mute) */}
@@ -195,6 +228,14 @@ export const GameShell: React.FC<GameShellProps> = ({ children }) => {
 
         {/* Shop Modal */}
         {activeModal === 'shop' && <ShopModal onClose={() => setActiveModal('none')} />}
+
+        {/* Upgrades Modal */}
+        {activeModal === 'upgrades' && <UpgradesModal onClose={() => setActiveModal('none')} />}
+
+        {/* Achievements Modal */}
+        {activeModal === 'achievements' && (
+          <AchievementsModal onClose={() => setActiveModal('none')} />
+        )}
       </div>
     </div>
   )

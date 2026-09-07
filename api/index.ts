@@ -5,6 +5,8 @@ import { sessionRouter } from './routes/session'
 import { playerRouter } from './routes/player'
 import { ordersRouter } from './routes/orders'
 import { shopRouter } from './routes/shop'
+import { upgradesRouter } from './routes/upgrades'
+import { achievementsRouter } from './routes/achievements'
 
 export const config = {
   runtime: 'nodejs',
@@ -99,6 +101,8 @@ v1.route('/session', sessionRouter)
 v1.route('/player', playerRouter)
 v1.route('/orders', ordersRouter)
 v1.route('/shop', shopRouter)
+v1.route('/upgrades', upgradesRouter)
+v1.route('/achievements', achievementsRouter)
 
 app.route('/v1', v1)
 

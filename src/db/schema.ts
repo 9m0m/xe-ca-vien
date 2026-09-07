@@ -101,3 +101,33 @@ export const orderRuns = pgTable(
     idempotencyIdx: index('idx_order_runs_idempotency').on(table.idempotencyKey),
   }),
 )
+
+// 7. Player Stats (Orders, perfect fries, total revenue)
+export const playerStats = pgTable('player_stats', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  playerId: uuid('player_id')
+    .notNull()
+    .unique()
+    .references(() => players.id, { onDelete: 'cascade' }),
+  ordersServed: integer('orders_served').notNull().default(0),
+  perfectItemsFried: integer('perfect_items_fried').notNull().default(0),
+  totalCoinsEarned: integer('total_coins_earned').notNull().default(0),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+})
+
+// 8. Player Achievements
+export const playerAchievements = pgTable(
+  'player_achievements',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    achievementId: varchar('achievement_id', { length: 64 }).notNull(),
+    claimed: boolean('claimed').notNull().default(false),
+    unlockedAt: timestamp('unlocked_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => ({
+    playerAchievementIdx: index('idx_player_achievements').on(table.playerId, table.achievementId),
+  }),
+)

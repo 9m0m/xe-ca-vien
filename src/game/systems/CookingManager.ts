@@ -15,6 +15,8 @@ export class CookingManager {
   private selectedSauces: string[] = []
   private hasDuaChua = false
   private currentOrder: CustomerOrder | null = null
+  private perfectWindowBonusMs = 0
+  private customerPatienceBonusMs = 0
 
   private customerNames = [
     'Khách quen áo xanh',
@@ -31,6 +33,32 @@ export class CookingManager {
     this.maxPanSlots = maxPanSlots
     this.slots = new Array(maxPanSlots).fill(null)
     this.generateCustomerOrder()
+  }
+
+  public setUpgradeModifiers(mods: {
+    maxPanSlots?: number
+    perfectWindowBonusMs?: number
+    customerPatienceBonusMs?: number
+  }): void {
+    if (mods.maxPanSlots !== undefined && mods.maxPanSlots !== this.maxPanSlots) {
+      if (mods.maxPanSlots > this.maxPanSlots) {
+        const diff = mods.maxPanSlots - this.maxPanSlots
+        for (let i = 0; i < diff; i++) {
+          this.slots.push(null)
+        }
+      } else {
+        this.slots = this.slots.slice(0, mods.maxPanSlots)
+      }
+      this.maxPanSlots = mods.maxPanSlots
+    }
+
+    if (mods.perfectWindowBonusMs !== undefined) {
+      this.perfectWindowBonusMs = mods.perfectWindowBonusMs
+    }
+
+    if (mods.customerPatienceBonusMs !== undefined) {
+      this.customerPatienceBonusMs = mods.customerPatienceBonusMs
+    }
   }
 
   public getMaxSlots(): number {
@@ -113,7 +141,8 @@ export class CookingManager {
       item.elapsedMs += deltaMs
 
       const cookTime = config.cookTimeMs
-      const perfectEnd = cookTime + config.perfectWindowMs
+      const perfectWindow = config.perfectWindowMs + this.perfectWindowBonusMs
+      const perfectEnd = cookTime + perfectWindow
 
       if (item.elapsedMs < cookTime * 0.6) {
         item.state = 'raw'
@@ -123,7 +152,7 @@ export class CookingManager {
         item.progress = item.elapsedMs / cookTime
       } else if (item.elapsedMs <= perfectEnd) {
         item.state = 'perfect'
-        item.progress = 1.0 + (item.elapsedMs - cookTime) / config.perfectWindowMs
+        item.progress = 1.0 + (item.elapsedMs - cookTime) / perfectWindow
       } else {
         item.state = 'overcooked'
         item.progress = 2.0 + (item.elapsedMs - perfectEnd) / config.overcookTimeMs
@@ -201,7 +230,7 @@ export class CookingManager {
       hasDuaChua,
       servingStyle,
       createdAt: Date.now(),
-      patienceMs: 50000,
+      patienceMs: 50000 + this.customerPatienceBonusMs,
     }
 
     this.currentOrder = order

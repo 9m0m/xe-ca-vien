@@ -3,6 +3,7 @@
 ## Completed Phases
 
 ### Phase 1 — Repository Foundation (COMPLETE)
+
 - **Tooling & Setup**:
   - Initialized Git with `main` branch and remote `https://github.com/9m0m/xe-ca-vien.git`.
   - pnpm 9 + Node.js 22 + React 19 + strict TypeScript + Vite 6 + Tailwind CSS + Phaser 3.90.
@@ -21,6 +22,7 @@
 ---
 
 ### Phase 2 — Cooking Vertical Slice (COMPLETE)
+
 - **Data Model & Catalog**:
   - Generic `FoodItemConfig` interface in `src/game/types.ts` defining cook timings, perfect windows, rewards, shapes, and serving styles.
   - Initial Tier 1 catalog seeded in `src/game/data/catalog.ts` (`fish_ball_classic`, `beef_ball_classic`, `sausage_red`, `fish_tofu`).
@@ -36,6 +38,7 @@
 ---
 
 ### Phase 3 — PostgreSQL Persistence (COMPLETE)
+
 - **Database & Drizzle ORM**:
   - Configured Drizzle ORM with `@neondatabase/serverless` and PostgreSQL migration generator.
   - Schema defined in `src/db/schema.ts`: `players`, `player_sessions`, `player_progress`, `player_food_unlocks`, `player_upgrades`, and `order_runs`.
@@ -52,6 +55,7 @@
 ---
 
 ### Phase 4 — Large Content Catalog (COMPLETE)
+
 - **Full 60-Item Catalog**:
   - All 60 authentic street-food snack items from `docs/FOOD_CATALOG.md` (Sections A through F) wired into typed data structures across 5 unlock tiers and 6 categories (`vien`, `tofu_cake`, `sausage`, `surimi`, `dumpling`, `cheese_crispy`).
   - Procedural geometric textures in `BootScene` for all shape profiles (`round`, `cylinder`, `cube`, `dumpling`, `flat`, `specialty`) with distinct silhouettes.
@@ -68,6 +72,7 @@
 ---
 
 ### Phase 5 — Sauce / Serving Depth (COMPLETE)
+
 - **Southern Vietnamese Sauce System**:
   - Catalog in `src/game/data/sauces.ts`: Tương ớt (`tuong_ot`), Tương đen (`tuong_den`), Mayonnaise (`mayo`), Sốt me (`sot_me`), Sa tế (`sa_te`), Dưa chua ăn kèm (`dua_chua`).
   - Procedural squeeze bottle sprites and pickle bowl in `BootScene`.
@@ -92,6 +97,7 @@
 ---
 
 ## Current Architecture Decisions
+
 1. **Frontend**: React 19 + TypeScript + Vite + Phaser 3 + Zustand.
 2. **Backend**: Hono on Vercel Functions (`/api/v1/...`).
 3. **Food & Sauce Simulation**: Deterministic data-driven modeling in `CookingManager` and `catalog.ts` / `sauces.ts`.
@@ -101,13 +107,54 @@
 ---
 
 ## Next Phase
-- **Phase 6 — Progression & Upgrades**:
-  - Cart upgrades catalog:
-    - Pan capacity (expand from 6 to 8 or 10 slots)
-    - Oil temperature controller (widens perfect frying window)
-    - Cart presentation awning (boosts customer patience timer)
-    - Auto-skewer/plating station
-  - Player level milestones & experience curve.
-  - Street-food cart achievements system (`Thợ Chiên Tân Binh`, `Đệ Nhất Cá Viên`, `Khách Quen Vạn Người Mê`).
-  - Upgrades shop modal in React UI (`Nâng Cấp Xe Cá Viên`).
-  - Server-authoritative upgrade purchase endpoint (`POST /api/v1/upgrades/purchase`).
+
+### Phase 6 — Progression & Upgrades (COMPLETE)
+- **Cart Upgrades System**:
+  - Typed multi-tier catalog in `src/game/data/upgrades.ts`:
+    - `pan_capacity`: Chảo Dầu Mở Rộng (6 -> 8 -> 10 vị trí chiên đồng thời).
+    - `oil_thermostat`: Bếp Gas Điều Nhiệt (+1s / +2s thời gian chín vàng hoàn hảo).
+    - `awning_comfort`: Mái Bạt Che Mát Vỉa Hè (+15s / +30s thời gian khách kiên nhẫn).
+    - `speed_tongs`: Kẹp Gắp Inox Siêu Tốc (tăng tốc độ gắp ráo dầu lên dĩa 50% - 100%).
+    - `tray_expansion`: Khay Bày Hàng Mở Rộng (trưng bày 6 món mỗi trang thay vì 4).
+- **Achievements & Street Vendor Statistics**:
+  - Catalog in `src/game/data/achievements.ts`: 8 street snack milestones (`Khai Trương Buôn May`, `Khách Quen Vỉa Hè`, `Bậc Thầy Chảo Dầu`, `Tay Chiên Chuẩn Xác`, `Đệ Nhất Cá Viên`, `Thực Đơn Phong Phú`, `Nâng Cấp Cơ Ngơi`, `Đại Gia Vỉa Hè`).
+  - Audited stats tracking in `player_stats`: `ordersServed`, `perfectItemsFried`, `totalCoinsEarned`.
+  - Claim reward system in `player_achievements` and `POST /api/v1/achievements/claim`.
+- **Database & Server Authority**:
+  - Drizzle migration `drizzle/0002_steep_galactus.sql` tracking `player_upgrades`, `player_stats`, `player_achievements`.
+  - Server endpoints:
+    - `GET /api/v1/upgrades/catalog`: Returns cart upgrades catalog.
+    - `POST /api/v1/upgrades/purchase`: Validates level requirement, cost, max tier, and deducts coins server-side.
+    - `GET /api/v1/achievements/list` & `POST /api/v1/achievements/claim`: Claim reward coins and XP securely.
+- **Frontend & Phaser Integration**:
+  - `UpgradesModal` ("Nâng Cấp Xe Cá Viên"): Tactile hardware upgrades modal with level locks and coin purchase buttons.
+  - `AchievementsModal` ("Thành Tựu & Kỷ Lục"): Vendor statistics overview (Đơn hàng, Xiên vàng, Doanh thu) and interactive claim buttons.
+  - Header HUD in `GameShell.tsx` updated with `Wrench` (Upgrades) and `Trophy` (Achievements) modals.
+  - Phaser `KitchenScene` dynamically renders 6, 8, or 10 pan slots upon upgrade, applies oil thermostat buffer, speeds up scooping animation, and expands prep tray pagination.
+- **Verification Commands & Results**:
+  - `pnpm run typecheck`: Passed (0 errors)
+  - `pnpm run lint`: Passed (0 errors, 0 warnings)
+  - `pnpm run format`: Passed (all files match Prettier style)
+  - `pnpm run test`: Passed (9 test files, 36 tests passed)
+  - `pnpm run build`: Passed (clean production build)
+
+---
+
+## Current Architecture Decisions
+
+1. **Frontend**: React 19 + TypeScript + Vite + Phaser 3 + Zustand.
+2. **Backend**: Hono on Vercel Functions (`/api/v1/...`).
+3. **Food & Sauce Simulation**: Deterministic data-driven modeling in `CookingManager` and `catalog.ts` / `sauces.ts`.
+4. **Authority**: Progression, unlocks, upgrades, achievements, and rewards are strictly server-authoritative.
+5. **Database**: PostgreSQL on Neon via Drizzle ORM.
+
+---
+
+## Next Phase
+
+- **Phase 7 — Art Production**:
+  - Replace procedural geometric placeholders with canonical 2.5D / isometric Southern Vietnamese street cart illustration assets.
+  - Canonical food silhouettes tested at small phone resolution (320px – 390px).
+  - High-res sprite sheet / texture atlas pipeline.
+  - Street environment detailing: Inox cart reflection, red plastic stools, chalkboard menu styling.
+
